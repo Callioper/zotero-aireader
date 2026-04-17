@@ -53,6 +53,7 @@ jobs:
           cp addon/prefs.js .scaffold/build/addon/
           find .scaffold/build/addon -name "*.xhtml" -exec sed -i 's/__addonRef__/zoteroAIRreader/g' {} \;
           find .scaffold/build/addon -name "*.js" -exec sed -i 's/__addonRef__/zoteroAIRreader/g' {} \;
+          find .scaffold/build/addon -name "*.js" -exec sed -i 's/__addonInstance__/ZoteroAIRreader/g' {} \;
 
       - name: Show build output
         run: ls -la .scaffold/build/addon/content/scripts/
