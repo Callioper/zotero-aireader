@@ -8,20 +8,8 @@ const basicTool = new BasicTool();
 if (!basicTool.getGlobal("Zotero")[config.addonInstance]) {
   _globalThis.Zotero = basicTool.getGlobal("Zotero");
   _globalThis.addon = new Addon();
-  defineGlobal("ztoolkit", () => {
-    return _globalThis.addon.data.ztoolkit;
-  });
-  // @ts-ignore - Plugin instance is not typed
-  Zotero[config.addonInstance] = addon;
-  addon.hooks.onStartup();
-}
-
-function defineGlobal(name: Parameters<BasicTool["getGlobal"]>[0]): void;
-function defineGlobal(name: string, getter: () => any): void;
-function defineGlobal(name: string, getter?: () => any) {
-  Object.defineProperty(_globalThis, name, {
-    get() {
-      return getter ? getter() : basicTool.getGlobal(name);
-    },
-  });
+  _globalThis.ztoolkit = _globalThis.addon.data.ztoolkit;
+  // @ts-expect-error - Plugin instance is not typed
+  Zotero[config.addonInstance] = _globalThis.addon;
+  _globalThis.addon.hooks.onStartup();
 }
