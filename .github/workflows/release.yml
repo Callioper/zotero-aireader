@@ -24,6 +24,7 @@ jobs:
 
       - name: Build plugin
         run: |
+          mkdir -p .scaffold/build/addon/content/scripts
           ./node_modules/.bin/esbuild src/index.ts \
             --bundle \
             --target=firefox115 \
