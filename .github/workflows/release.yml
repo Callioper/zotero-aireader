@@ -14,6 +14,6 @@ jobs:
   create-release:
     uses: zotero-plugin-dev/workflows/.github/workflows/release-plugin.yml@main
     with:
-      build: "cd plugin && npm install && npm run build"
-      release: "cd plugin && npm run release"
+      build: "npm run build"
+      release: "npm run release"
     secrets: inherit
