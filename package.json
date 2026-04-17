@@ -19,9 +19,9 @@
   },
   "homepage": "https://github.com/your-name/ai-reader-zotero-plugin#readme",
   "scripts": {
-    "start": "zotero-plugin serve",
-    "build": "zotero-plugin build",
-    "release": "zotero-plugin release"
+    "start": "npx zotero-plugin serve",
+    "build": "npx zotero-plugin build",
+    "release": "npx zotero-plugin release"
   },
   "dependencies": {},
   "devDependencies": {
