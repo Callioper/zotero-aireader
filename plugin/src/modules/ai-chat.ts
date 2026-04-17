@@ -1,7 +1,7 @@
 import { apiClient, ChatResponse } from "./api-client";
 
 export class AIChatPanel {
-  private panel: any;
+  private panel: Element;
   private itemId: number | null = null;
   private pdfPath: string | null = null;
 
@@ -69,15 +69,28 @@ export class AIChatPanel {
       existingPanel.remove();
     }
 
+    const messagesContainer = document.getElementById("chat-messages");
+    if (messagesContainer) {
+      messagesContainer.innerHTML = "";
+    }
+
     this.panel.id = "zotero-air-chat-panel";
     ztoolkit.append(document.body, this.panel);
 
     await this.indexDocument();
   }
 
+  private setInputEnabled(enabled: boolean) {
+    const input = document.getElementById("chat-input") as XUL.TextBox | null;
+    const buttons = document.querySelectorAll("#chat-input + button");
+    if (input) input.disabled = !enabled;
+    buttons.forEach((btn) => ((btn as XUL.Button).disabled = !enabled));
+  }
+
   private async indexDocument() {
     if (!this.itemId || !this.pdfPath) return;
 
+    this.setInputEnabled(false);
     try {
       const health = await apiClient.health();
       if (health.status !== "ok") {
@@ -90,6 +103,8 @@ export class AIChatPanel {
       this.showMessage("索引建立完成，可以开始提问了。", "success");
     } catch (error) {
       this.showMessage(`索引失败: ${error}`, "error");
+    } finally {
+      this.setInputEnabled(true);
     }
   }
 
@@ -104,6 +119,7 @@ export class AIChatPanel {
 
     if (!this.itemId) return;
 
+    this.setInputEnabled(false);
     try {
       this.showMessage("思考中...", "info");
       const response = await apiClient.chat({
@@ -115,6 +131,8 @@ export class AIChatPanel {
       this.displayResponse(response);
     } catch (error) {
       this.showMessage(`回答失败: ${error}`, "error");
+    } finally {
+      this.setInputEnabled(true);
     }
   }
 
