@@ -77,27 +77,8 @@ jobs:
           OWNER=Callioper
           REPO=zotero-aireader
           HASH=$(sha256sum .scaffold/build/zotero-ai-reader.xpi | cut -d' ' -f1)
-          cat > update.json << EOF
-          {
-            "addons": {
-              "zotero-ai-reader@callioper": {
-                "updates": [
-                  {
-                    "version": "$VERSION",
-                    "update_link": "https://github.com/$OWNER/$REPO/releases/download/$TAG_NAME/zotero-ai-reader.xpi",
-                    "update_hash": "sha256:$HASH",
-                    "applications": {
-                      "zotero": {
-                        "strict_min_version": "6.999",
-                        "strict_max_version": "9.*"
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          }
-          EOF
+          printf '{"addons":{"zotero-ai-reader@callioper":{"updates":[{"version":"%s","update_link":"https://github.com/%s/%s/releases/download/%s/zotero-ai-reader.xpi","update_hash":"sha256:%s","applications":{"zotero":{"strict_min_version":"6.999","strict_max_version":"9.*"}}}]}}}' "$VERSION" "$OWNER" "$REPO" "$TAG_NAME" "$HASH" > update.json
+          cat update.json
 
       - name: Upload update.json
         uses: actions/upload-artifact@v4
