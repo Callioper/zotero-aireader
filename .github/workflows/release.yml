@@ -42,7 +42,7 @@ jobs:
           sed -i 's/__homepage__/https:\/\/github.com\/Callioper\/zotero-aireader/g' addon/manifest.json
           sed -i 's/__author__/Callioper/g' addon/manifest.json
           sed -i 's/__addonID__/zotero-ai-reader@callioper/g' addon/manifest.json
-          sed -i 's/__updateURL__/https:\/\/github.com\/Callioper\/zotero-aireader\/releases\/latest\/download\/update.json/g' addon/manifest.json
+          sed -i 's/__updateURL__/https:\/\/raw.githubusercontent.com\/Callioper\/zotero-aireader\/main\/update.json/g' addon/manifest.json
 
       - name: Copy and process addon files
         run: |
@@ -97,10 +97,10 @@ jobs:
           REPO=zotero-aireader
           HASH=$(sha256sum zotero-ai-reader.xpi | cut -d' ' -f1)
 
-          # Download existing update.json if it exists
+          # Download existing update.json
           curl -sL "https://raw.githubusercontent.com/$OWNER/$REPO/main/update.json" -o update.json 2>/dev/null || echo '{"addons":{"zotero-ai-reader@callioper":{"updates":[]}}}' > update.json
 
-          # Add new version to updates array
+          # Update the JSON
           node -e "
             const fs = require('fs');
             let update = JSON.parse(fs.readFileSync('update.json', 'utf8'));
@@ -115,15 +115,17 @@ jobs:
                 }
               }
             };
-            // Remove old version if exists and add new one at beginning
             update.addons['zotero-ai-reader@callioper'].updates = update.addons['zotero-ai-reader@callioper'].updates.filter(u => u.version !== '$VERSION');
             update.addons['zotero-ai-reader@callioper'].updates.unshift(newVersion);
             fs.writeFileSync('update.json', JSON.stringify(update, null, 2));
           "
 
-      - name: Commit update.json
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          file_pattern: update.json
-          commit_message: "chore: update update.json for ${{ github.ref_name }}"
-          branch: main
+          cat update.json
+
+      - name: Push update.json
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add update.json
+          git commit -m "chore: update update.json for ${{ github.ref_name }}" || echo "No changes to commit"
+          git push
