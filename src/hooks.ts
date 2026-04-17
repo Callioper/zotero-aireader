@@ -1,22 +1,23 @@
 import { config } from "../package.json";
-import { getPref } from "./utils/prefs";
 import { apiClient } from "./modules/api-client";
 import { aiChatPanel } from "./modules/ai-chat";
 
-async function onStartup() {
-  await Promise.all([
-    Zotero.initializationPromise,
-    Zotero.unlockPromise,
-    Zotero.uiReadyPromise,
-  ]);
+// rootURI should be set globally from bootstrap.js
+declare const rootURI: string;
 
-  ztoolkit.log("startup-begin");
+async function onStartup() {
+  await Zotero.initializationPromise;
+  await Zotero.unlockPromise;
+  await Zotero.uiReadyPromise;
+
+  ztoolkit.log("AI Reader: onStartup called, rootURI:", rootURI);
   registerNotifier();
   registerPrefs();
+  ztoolkit.log("AI Reader: onStartup completed");
 }
 
 function onShutdown() {
-  ztoolkit.log("startup-finish");
+  ztoolkit.log("AI Reader: onShutdown called");
   aiChatPanel.close();
   ztoolkit.unregisterAll();
   // @ts-ignore - Plugin instance is not typed
@@ -24,6 +25,8 @@ function onShutdown() {
 }
 
 async function onMainWindowLoad(win: Window): Promise<void> {
+  ztoolkit.log("AI Reader: onMainWindowLoad called, window:", win);
+
   await new Promise((resolve) => {
     if (win.document.readyState !== "complete") {
       win.document.addEventListener("readystatechange", () => {
@@ -31,20 +34,20 @@ async function onMainWindowLoad(win: Window): Promise<void> {
           resolve(void 0);
         }
       });
+    } else {
+      resolve(void 0);
     }
-    resolve(void 0);
   });
 
-  await Promise.all([
-    Zotero.initializationPromise,
-    Zotero.unlockPromise,
-    Zotero.uiReadyPromise,
-  ]);
+  await Zotero.uiReadyPromise;
+  ztoolkit.log("AI Reader: document ready, registering menu");
 
   registerMenu(win);
+  ztoolkit.log("AI Reader: menu registered");
 }
 
 function onMainWindowUnload(win: Window): void {
+  ztoolkit.log("AI Reader: onMainWindowUnload called");
   ztoolkit.unregisterAll();
 }
 
@@ -57,7 +60,7 @@ function registerNotifier() {
         ids: Array<string | number>,
         extraData: { [key: string]: any },
       ) => {
-        // Handle item changes if needed
+        ztoolkit.log("AI Reader: notified", event, type, ids);
       },
     },
     ["item"],
@@ -66,32 +69,37 @@ function registerNotifier() {
 }
 
 function registerPrefs() {
-  ztoolkit.PrefsPane.add({
-    pluginID: config.addonID,
-    src: rootURI + "content/preferences.xhtml",
-    label: "AI Reader",
-    iconURL: rootURI + "content/icons/favicon.png",
-  });
+  ztoolkit.log("AI Reader: registerPrefs called, ztoolkit:", ztoolkit, "rootURI:", rootURI);
+  if (!ztoolkit) {
+    ztoolkit.log("AI Reader ERROR: ztoolkit is undefined!");
+    return;
+  }
+  try {
+    ztoolkit.PrefsPane.add({
+      pluginID: config.addonID,
+      src: rootURI + "content/preferences.xhtml",
+      label: "AI Reader",
+      iconURL: rootURI + "content/icons/favicon.png",
+    });
+    ztoolkit.log("AI Reader: PrefsPane added");
+  } catch (e) {
+    ztoolkit.log("AI Reader ERROR in registerPrefs:", e);
+  }
 }
 
 function registerMenu(win: Window) {
   const menuPopup = win.document.getElementById("item-context-menu");
   if (!menuPopup) {
-    ztoolkit.log("item-context-menu not found");
+    ztoolkit.log("AI Reader ERROR: item-context-menu not found");
     return;
   }
+  ztoolkit.log("AI Reader: found item-context-menu");
 
-  const submenu = ztoolkit.createElement(win.document, "menu", {
-    namespace: "xul",
-    attributes: {
-      label: "AI Reader",
-      id: "zotero-air-reader-menu",
-    },
-  });
+  const submenu = win.document.createElement("menu");
+  submenu.setAttribute("id", "zotero-air-reader-menu");
+  submenu.setAttribute("label", "AI Reader");
 
-  const menupopup = ztoolkit.createElement(win.document, "menupopup", {
-    namespace: "xul",
-  });
+  const menupopup = win.document.createElement("menupopup");
 
   const menuItems = [
     { label: "AI 问答", command: () => onAIChat() },
@@ -100,21 +108,15 @@ function registerMenu(win: Window) {
   ];
 
   for (const item of menuItems) {
-    const menuitem = ztoolkit.createElement(win.document, "menuitem", {
-      namespace: "xul",
-      attributes: { label: item.label },
-      listeners: [
-        {
-          type: "command",
-          listener: item.command,
-        },
-      ],
-    });
+    const menuitem = win.document.createElement("menuitem");
+    menuitem.setAttribute("label", item.label);
+    menuitem.addEventListener("command", item.command);
     menupopup.appendChild(menuitem);
   }
 
   submenu.appendChild(menupopup);
   menuPopup.appendChild(submenu);
+  ztoolkit.log("AI Reader: menu items added");
 }
 
 async function onAIChat() {
