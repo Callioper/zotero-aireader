@@ -29,7 +29,7 @@ def do_index(item_id: int, pdf_path: str):
     dim = 384
     embeddings = np.random.randn(len(texts), dim).tolist()
 
-    vector_store.add_documents(chunks, embeddings)
+    vector_store.add_documents(texts, embeddings, metadatas)
 
     rag = RAGSearch(vector_store)
     rag.index_for_bm25(texts)

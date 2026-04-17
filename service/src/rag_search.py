@@ -93,7 +93,7 @@ class RAGSearch:
                 if idx < len(self.vector_store.texts):
                     doc = Document(
                         page_content=self.vector_store.texts[idx],
-                        metadata={**self.vector_store.metadatas[idx], "score": float(score)}
+                        metadata={**self.vector_store.metadatas[idx], "score": float(score), "result_index": idx}
                     )
                     results.append(doc)
             return results

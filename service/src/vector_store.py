@@ -19,9 +19,14 @@ class VectorStore:
         self.metadatas = []
         self.index = None
 
-    def add_documents(self, documents: list[Document], embeddings: list[list[float]]) -> None:
-        self.texts = [doc.page_content for doc in documents]
-        self.metadatas = [doc.metadata for doc in documents]
+    def add_documents(self, texts: list[str], embeddings: list[list[float]], metadatas: list[dict]) -> None:
+        if len(texts) != len(embeddings):
+            raise ValueError(f"Number of texts ({len(texts)}) must match number of embeddings ({len(embeddings)})")
+        if len(texts) != len(metadatas):
+            raise ValueError(f"Number of texts ({len(texts)}) must match number of metadatas ({len(metadatas)})")
+
+        self.texts = texts
+        self.metadatas = metadatas
 
         dim = len(embeddings[0])
         self.index = faiss.IndexFlatIP(dim)
@@ -56,7 +61,7 @@ class VectorStore:
 
             doc = Document(
                 page_content=self.texts[idx],
-                metadata={**metadata, "score": float(score)}
+                metadata={**metadata, "score": float(score), "result_index": idx}
             )
             results.append(doc)
 

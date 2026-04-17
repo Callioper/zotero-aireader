@@ -39,12 +39,10 @@ class TestBM25:
 class TestVectorStore:
     def test_add_and_search(self, tmp_path):
         store = VectorStore(store_path=tmp_path / "test_store")
-        docs = [
-            Document(page_content="content one", metadata={"chunk_id": "1"}),
-            Document(page_content="content two", metadata={"chunk_id": "2"}),
-        ]
+        texts = ["content one", "content two"]
+        metadatas = [{"chunk_id": "1"}, {"chunk_id": "2"}]
         embeddings = [[1.0, 0.0], [0.0, 1.0]]
-        store.add_documents(docs, embeddings)
+        store.add_documents(texts, embeddings, metadatas)
 
         results = store.search([0.5, 0.5], k=1)
         assert len(results) == 1
@@ -54,24 +52,20 @@ class TestVectorStore:
         store = VectorStore(store_path=tmp_path / "new_store")
         assert not store.exists()
 
-        docs = [Document(page_content="test", metadata={"chunk_id": "1"})]
-        store.add_documents(docs, [[1.0, 0.0]])
+        store.add_documents(["test"], [[1.0, 0.0]], [{"chunk_id": "1"}])
         assert store.exists()
 
 
 class TestRAGSearch:
     def test_bm25_only_search(self, tmp_path):
         store = VectorStore(store_path=tmp_path / "test_store")
-        docs = [
-            Document(page_content="apple fruit is sweet", metadata={"chunk_id": "1"}),
-            Document(page_content="banana fruit is yellow", metadata={"chunk_id": "2"}),
-            Document(page_content="carrot vegetable is orange", metadata={"chunk_id": "3"}),
-        ]
+        texts = ["apple fruit is sweet", "banana fruit is yellow", "carrot vegetable is orange"]
+        metadatas = [{"chunk_id": "1"}, {"chunk_id": "2"}, {"chunk_id": "3"}]
         embeddings = [[1.0, 0.0], [0.0, 1.0], [0.5, 0.5]]
-        store.add_documents(docs, embeddings)
+        store.add_documents(texts, embeddings, metadatas)
 
         rag = RAGSearch(store)
-        rag.index_for_bm25(["apple fruit is sweet", "banana fruit is yellow", "carrot vegetable is orange"])
+        rag.index_for_bm25(texts)
 
         results = rag.hybrid_search("fruit")
         assert len(results) >= 1
@@ -79,16 +73,13 @@ class TestRAGSearch:
 
     def test_hybrid_search(self, tmp_path):
         store = VectorStore(store_path=tmp_path / "test_store")
-        docs = [
-            Document(page_content="python programming language", metadata={"chunk_id": "1"}),
-            Document(page_content="java programming language", metadata={"chunk_id": "2"}),
-            Document(page_content="python snake animal", metadata={"chunk_id": "3"}),
-        ]
+        texts = ["python programming language", "java programming language", "python snake animal"]
+        metadatas = [{"chunk_id": "1"}, {"chunk_id": "2"}, {"chunk_id": "3"}]
         embeddings = [[1.0, 0.0], [0.0, 1.0], [0.8, 0.2]]
-        store.add_documents(docs, embeddings)
+        store.add_documents(texts, embeddings, metadatas)
 
         rag = RAGSearch(store)
-        rag.index_for_bm25([d.page_content for d in docs])
+        rag.index_for_bm25(texts)
 
         query_embedding = [0.9, 0.1]
         results = rag.hybrid_search("python", query_embedding=query_embedding, k=2)
@@ -96,8 +87,7 @@ class TestRAGSearch:
 
     def test_no_bm25_index(self, tmp_path):
         store = VectorStore(store_path=tmp_path / "test_store")
-        docs = [Document(page_content="test content", metadata={"chunk_id": "1"})]
-        store.add_documents(docs, [[1.0, 0.0]])
+        store.add_documents(["test content"], [[1.0, 0.0]], [{"chunk_id": "1"}])
 
         rag = RAGSearch(store)
         results = rag.hybrid_search("test", query_embedding=[1.0, 0.0])
