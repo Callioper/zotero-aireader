@@ -1,3 +1,4 @@
+import threading
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -6,38 +7,18 @@ from src.config import settings
 
 router = APIRouter()
 
-
-class ChatRequest(BaseModel):
-    item_id: int
-    question: str
-    use_rag: bool = True
-    provider: str | None = None
-    model: str | None = None
-
-
-class Citation(BaseModel):
-    index: int
-    chapter_title: str
-    chapter_index: int
-    page_num: int | None
-    quoted_text: str
-    reasoning: str
-
-
-class ChatResponse(BaseModel):
-    answer: str
-    citations: list[Citation]
-
-
 _item_store = {}
+_item_lock = threading.Lock()
 
 
 def set_item_store(item_id: int, data: dict):
-    _item_store[item_id] = data
+    with _item_lock:
+        _item_store[item_id] = data
 
 
 def get_item_store(item_id: int) -> dict | None:
-    return _item_store.get(item_id)
+    with _item_lock:
+        return _item_store.get(item_id)
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -75,11 +56,14 @@ Answer Requirements:
 3. If reference material is insufficient, say you cannot answer
 """
 
-    answer = await llm_manager.chat(
-        messages=[{"role": "user", "content": req.question}],
-        provider=req.provider,
-        model=req.model,
-        system_prompt=system_prompt,
-    )
+    try:
+        answer = await llm_manager.chat(
+            messages=[{"role": "user", "content": req.question}],
+            provider=req.provider,
+            model=req.model,
+            system_prompt=system_prompt,
+        )
+    except Exception as e:
+        raise HTTPException(500, f"LLM error: {str(e)}")
 
     return ChatResponse(answer=answer, citations=citations)

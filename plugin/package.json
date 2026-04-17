@@ -1,10 +1,23 @@
 {
-  "name": "zotero-ai-reader",
   "version": "1.0.0",
   "description": "AI-powered PDF reader for Zotero",
   "author": "Your Name",
-  "license": "MIT",
-  "type": "module",
+  "license": "AGPL-3.0",
+  "config": {
+    "addonName": "Zotero AI Reader",
+    "addonID": "zotero-ai-reader@yourname",
+    "addonRef": "zoteroAIRreader",
+    "addonInstance": "ZoteroAIRreader",
+    "prefsPrefix": "extensions.zotero-zoteroAIRreader"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-name/ai-reader-zotero-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-name/ai-reader-zotero-plugin/issues"
+  },
+  "homepage": "https://github.com/your-name/ai-reader-zotero-plugin#readme",
   "scripts": {
     "start": "zotero-plugin serve",
     "build": "zotero-plugin build",

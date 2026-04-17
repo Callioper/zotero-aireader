@@ -1,34 +1,104 @@
-import { apiClient } from "./modules/api-client";
+import { config } from "../package.json";
+import { getPref } from "./utils/prefs";
 
-export default {
-  onStartUp() {
-    // 插件启动
+const hooks = {
+  onStartup() {
+    ztoolkit.log("startup-begin");
+    this.registerNotifier();
+    this.registerPrefs();
+    this.registerMenu();
   },
 
-  onShutDown() {
-    // 插件关闭
+  onShutdown() {
+    ztoolkit.log("startup-finish");
+    this.data.initialized = false;
   },
 
   async onMainWindowLoad(window: Window) {
-    // 注册菜单
-    this.registerMenus();
+    this.registerRightClickMenuItem(window);
+    this.registerKeyboardShortcuts(window);
   },
 
-  registerMenus() {
-    const menuString = `
-      <menupopup id="zotero-item-menu">
-        <menuitem id="zotero-ai-reader-chat"
-                  label="AI 问答"
-                  oncommand="addon.hooks.onAIChat()"/>
-        <menuitem id="zotero-ai-reader-summarize"
-                  label="总结文献"
-                  oncommand="addon.hooks.onSummarize()"/>
-        <menuitem id="zotero-ai-reader-search"
-                  label="语义搜索"
-                  oncommand="addon.hooks.onSearch()"/>
-      </menupopup>
-    `;
-    // 实际注册逻辑使用 zotero-toolkit
+  onMainWindowUnload(window: Window) {
+    ztoolkit.unregisterAll();
+  },
+
+  onPrefsEvent(event: string, data: { window: Window }) {
+    switch (event) {
+      case "load":
+        this.initPrefsPanel(data.window);
+        break;
+    }
+  },
+
+  registerNotifier() {
+    Zotero.Notifier.registerObserver(
+      {
+        notify: (
+          event: string,
+          type: string,
+          ids: Array<string | number>,
+          extraData: { [key: string]: any },
+        ) => {
+          if (event === "add" && type === "item") {
+            // Handle new item added
+          }
+        },
+      },
+      ["item"],
+      "zotero-ai-reader",
+    );
+  },
+
+  registerPrefs() {
+    ztoolkit.PrefsPane.add({
+      pluginID: config.addonID,
+      src: rootURI + "content/preferences.xhtml",
+      label: "AI Reader",
+      iconURL: rootURI + "content/icons/favicon.png",
+    });
+  },
+
+  registerMenu() {
+    ztoolkit.Menu.register("item", {
+      label: "AI Reader",
+      icon: rootURI + "content/icons/favicon.png",
+      children: [
+        {
+          label: "AI 问答",
+          icon: rootURI + "content/icons/favicon.png",
+          command: () => {
+            this.onAIChat();
+          },
+        },
+        {
+          label: "总结文献",
+          icon: rootURI + "content/icons/favicon.png",
+          command: () => {
+            this.onSummarize();
+          },
+        },
+        {
+          label: "语义搜索",
+          icon: rootURI + "content/icons/favicon.png",
+          command: () => {
+            this.onSearch();
+          },
+        },
+      ],
+    });
+  },
+
+  registerRightClickMenuItem(window: Window) {
+    // Register right-click menu items using zotero-plugin-toolkit
+  },
+
+  registerKeyboardShortcuts(window: Window) {
+    // Register keyboard shortcuts
+  },
+
+  initPrefsPanel(window: Window) {
+    // Initialize preferences panel
   },
 
   async onAIChat() {
@@ -42,42 +112,17 @@ export default {
     const pdfPath = await attachment.getFilePath?.();
     if (!pdfPath) return;
 
-    // 索引
-    await apiClient.indexItem(item.id, pdfPath);
-
-    // 打开问答面板
-    const question = await this.showPrompt("AI 问答", "请输入您的问题:");
-    if (!question) return;
-
-    const response = await apiClient.chat({
-      item_id: item.id,
-      question,
-      use_rag: true,
-    });
-
-    this.showAnswer(response);
+    // TODO: Call backend API to index and chat
+    ztoolkit.log("AI Chat requested for:", pdfPath);
   },
 
   async onSummarize() {
-    // 实现总结功能
+    ztoolkit.log("Summarize requested");
   },
 
   async onSearch() {
-    // 实现语义搜索
-  },
-
-  async showPrompt(title: string, message: string): Promise<string | null> {
-    // 显示输入对话框
-    return new Promise((resolve) => {
-      const result = window.prompt(message, "");
-      resolve(result);
-    });
-  },
-
-  showAnswer(response: any) {
-    // 显示回答
-    const msg = response.answer + "\n\n参考来源:\n" +
-      response.citations.map((c: any) => `[${c.index}] ${c.chapter_title}: ${c.quoted_text}`).join("\n");
-    window.alert(msg);
+    ztoolkit.log("Search requested");
   },
 };
+
+export default hooks;

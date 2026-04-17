@@ -1,69 +1,62 @@
-# Zotero AI 阅读助手插件 - 实施计划
+# Zotero AI Reader Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Use subagent-driven-development (recommended) or executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**目标：** 开发 Zotero 插件，实现 AI 阅读助手功能（问答、总结、语义搜索、笔记增强）
+**Goal:** Develop a Zotero plugin with AI-powered PDF reading capabilities (Q&A, summarization, semantic search, note enhancement) using a separate Python backend service.
 
-**架构：** 插件 + 本地服务分离架构。Zotero 插件通过 HTTP 与 Python FastAPI 服务通信，后端处理 PDF 解析、向量化、LLM 调用。
+**Architecture:** Plugin + Local Service Separation. The Zotero plugin communicates with a Python FastAPI service via HTTP. The backend handles PDF parsing, vectorization, and LLM calls.
 
-**技术栈：**
-- Zotero 插件: TypeScript + Zotero Plugin Toolkit
-- Python 服务: FastAPI + LangChain + FAISS
-- 向量存储: FAISS + SQLite
-- AI 服务: Ollama/LM Studio (本地) + DeepSeek/OpenAI/Claude API
+**Tech Stack:**
+- Zotero Plugin: TypeScript + Zotero Plugin Toolkit
+- Python Service: FastAPI + LangChain + FAISS
+- Vector Storage: FAISS + SQLite
+- AI Services: Ollama/LM Studio (local) + DeepSeek/OpenAI/Claude API
 
 ---
 
-## 文件结构
+## File Structure
 
 ```
 ai-reader-zotero-plugin/
-├── service/                      # Python 后端服务
+├── service/                      # Python backend service
 │   ├── src/
 │   │   ├── __init__.py
-│   │   ├── main.py              # FastAPI 入口
-│   │   ├── config.py             # 配置管理
-│   │   ├── pdf_processor.py      # PDF 解析
-│   │   ├── chunker.py           # 文本分块
-│   │   ├── vector_store.py       # FAISS 向量存储
-│   │   ├── rag_search.py         # RAG 搜索 (BM25 + 向量)
-│   │   ├── llm.py               # LLM 调用封装
-│   │   └── routes/              # API 路由
+│   │   ├── main.py              # FastAPI entry
+│   │   ├── config.py             # Configuration
+│   │   ├── pdf_processor.py      # PDF parsing
+│   │   ├── chunker.py           # Text chunking
+│   │   ├── vector_store.py       # FAISS vector storage
+│   │   ├── rag_search.py         # RAG search (BM25 + vector)
+│   │   ├── llm.py               # LLM wrapper
+│   │   └── routes/              # API routes
 │   │       ├── __init__.py
-│   │       ├── chat.py          # 问答接口
-│   │       ├── index.py          # 索引接口
-│   │       └── search.py         # 搜索接口
-│   ├── tests/                   # 测试
+│   │       ├── chat.py          # Q&A endpoint
+│   │       ├── index.py          # Indexing endpoint
+│   │       └── search.py         # Search endpoint
+│   ├── tests/                   # Tests
 │   ├── requirements.txt
 │   └── .env.example
 │
-├── plugin/                      # Zotero 插件
+├── plugin/                      # Zotero plugin (already initialized)
 │   ├── addon/
-│   │   ├── manifest.json
-│   │   ├── bootstrap.js
-│   │   └── content/
-│   │       └── ai-panel.xhtml
 │   ├── src/
-│   │   ├── index.ts
-│   │   ├── hooks.ts
 │   │   ├── modules/
-│   │   │   ├── api-client.ts    # 后端 API 客户端
-│   │   │   ├── ai-chat.ts       # AI 问答 UI
-│   │   │   └── search.ts        # 语义搜索 UI
+│   │   │   ├── api-client.ts    # Backend API client
+│   │   │   ├── ai-chat.ts       # Q&A UI
+│   │   │   ├── search.ts        # Semantic search UI
+│   │   │   └── summarize.ts     # Summarization UI
 │   │   └── utils/
-│   │       └── config.ts        # 插件配置
-│   ├── package.json
-│   └── tsconfig.json
+│   └── package.json
 │
 └── docs/
-    └── 2026-04-17-zotero-ai-reader-design.md
+    └── implementation-plan.md
 ```
 
 ---
 
-## 第一阶段：Python 后端服务
+## Phase 1: Python Backend Service
 
-### Task 1: 项目初始化和配置
+### Task 1: Project Initialization and Configuration
 
 **Files:**
 - Create: `service/requirements.txt`
@@ -71,7 +64,13 @@ ai-reader-zotero-plugin/
 - Create: `service/src/__init__.py`
 - Create: `service/src/config.py`
 
-- [ ] **Step 1: 创建 requirements.txt**
+- [ ] **Step 1: Create service directory structure**
+
+```bash
+mkdir -p service/src/routes service/tests
+```
+
+- [ ] **Step 2: Create requirements.txt**
 
 ```txt
 fastapi==0.115.0
@@ -89,12 +88,13 @@ httpx==0.27.2
 sse-starlette==2.1.0
 openai==1.54.0
 anthropic==0.38.0
+sentence-transformers==3.0.1
 ```
 
-- [ ] **Step 2: 创建 .env.example**
+- [ ] **Step 3: Create .env.example**
 
 ```env
-# LLM 服务配置 (支持 Ollama/LM Studio/OpenAI/DeepSeek/Claude)
+# LLM Service Configuration (supports Ollama/LM Studio/OpenAI/DeepSeek/Claude)
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_API_KEY=ollama
 LMSTUDIO_BASE_URL=http://localhost:1234
@@ -103,20 +103,20 @@ DEEPSEEK_API_KEY=sk-xxxx
 OPENAI_API_KEY=sk-xxxx
 ANTHROPIC_API_KEY=sk-xxxx
 
-# 默认 LLM 提供者: ollama | lmstudio | deepseek | openai | claude
+# Default LLM Provider: ollama | lmstudio | deepseek | openai | claude
 DEFAULT_LLM_PROVIDER=ollama
 DEFAULT_LLM_MODEL=llama3.2
 
-# Embedding 配置
-EMBEDDING_PROVIDER=local  # local | openai | deepseek
+# Embedding Configuration
+EMBEDDING_PROVIDER=local
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 
-# 服务配置
+# Service Configuration
 HOST=127.0.0.1
 PORT=8765
 ```
 
-- [ ] **Step 3: 创建 config.py**
+- [ ] **Step 4: Create config.py**
 
 ```python
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -126,7 +126,6 @@ from pathlib import Path
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-    # LLM providers
     ollama_base_url: str = "http://localhost:11434"
     ollama_api_key: str = "ollama"
     lmstudio_base_url: str = "http://localhost:1234"
@@ -135,19 +134,15 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
 
-    # Default LLM
     default_llm_provider: str = "ollama"
     default_llm_model: str = "llama3.2"
 
-    # Embedding
     embedding_provider: str = "local"
     openai_embedding_model: str = "text-embedding-3-small"
 
-    # Server
     host: str = "127.0.0.1"
     port: int = 8765
 
-    # Storage
     vector_store_path: Path = Path("vectorstore")
     db_path: Path = Path("data.db")
 
@@ -156,25 +151,24 @@ settings = Settings()
 settings.vector_store_path.mkdir(parents=True, exist_ok=True)
 ```
 
-- [ ] **Step 4: 提交**
+- [ ] **Step 5: Create __init__.py and commit**
 
 ```bash
-git init ai-reader-zotero-plugin
-cd ai-reader-zotero-plugin
-git add service/requirements.txt service/.env.example service/src/
+touch service/src/__init__.py
+touch service/src/routes/__init__.py
+git add service/
 git commit -m "feat(service): initial project structure"
 ```
 
 ---
 
-### Task 2: PDF 解析和文本分块
+### Task 2: PDF Processing and Text Chunking
 
 **Files:**
 - Create: `service/src/pdf_processor.py`
 - Create: `service/src/chunker.py`
-- Create: `service/tests/test_pdf_processor.py`
 
-- [ ] **Step 1: 创建 pdf_processor.py**
+- [ ] **Step 1: Create pdf_processor.py**
 
 ```python
 from pathlib import Path
@@ -203,7 +197,7 @@ class PDFProcessor:
         chapters = []
         for i, item in enumerate(toc):
             level = item[0]
-            title = item[1].strip() if len(item) > 1 else f"章节{i+1}"
+            title = item[1].strip() if len(item) > 1 else f"Chapter {i+1}"
             page_num = item[2] - 1 if len(item) > 2 else 0
             chapters.append({"level": level, "title": title, "page": page_num})
         return chapters
@@ -214,7 +208,7 @@ class PDFProcessor:
 
         toc = self.extract_toc()
         if not toc:
-            return [{"title": "全文", "start_page": 0, "end_page": len(self.doc) - 1, "text": ""}]
+            return [{"title": "Full Text", "start_page": 0, "end_page": len(self.doc) - 1, "text": ""}]
 
         chapters = []
         for i, item in enumerate(toc):
@@ -259,7 +253,7 @@ def extract_pdf(pdf_path: str | Path) -> tuple[list[Document], dict]:
             page_content=chapter.get("text", ""),
             metadata={
                 "chapter_index": i,
-                "chapter_title": chapter.get("title", f"第{i+1}章"),
+                "chapter_title": chapter.get("title", f"Chapter {i+1}"),
                 "chapter_level": chapter.get("level", 1),
                 "start_page": chapter.get("start_page", 0),
                 "end_page": chapter.get("end_page", 0),
@@ -272,7 +266,7 @@ def extract_pdf(pdf_path: str | Path) -> tuple[list[Document], dict]:
     return documents, metadata
 ```
 
-- [ ] **Step 2: 创建 chunker.py**
+- [ ] **Step 2: Create chunker.py**
 
 ```python
 import re
@@ -283,7 +277,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 class ChineseTextSplitter(RecursiveCharacterTextSplitter):
     def __init__(self, separators: list[str] | None = None, **kwargs):
         if separators is None:
-            separators = ["\n\n", "\n", "。", "！", "？", "；", "，", "、", " ", ""]
+            separators = ["\n\n", "\n", ". ", "。", "！", "？", "；", "，", "、", " "]
         super().__init__(separators=separators, **kwargs)
 
 
@@ -312,45 +306,21 @@ class SemanticChunker:
         return chunked
 ```
 
-- [ ] **Step 3: 创建测试文件**
-
-```python
-import pytest
-from pathlib import Path
-from src.pdf_processor import PDFProcessor, extract_pdf
-from src.chunker import SemanticChunker
-
-
-def test_pdf_processor():
-    # 需要一个测试 PDF 文件
-    pass  # TODO: 添加实际测试
-
-
-def test_chunker():
-    from langchain_core.documents import Document
-    chunker = SemanticChunker(chunk_size=100, chunk_overlap=20)
-    docs = [Document(page_content="这是测试内容" * 50, metadata={"chapter_index": 0})]
-    chunks = chunker.chunk_documents(docs)
-    assert len(chunks) > 0
-    assert chunks[0].metadata["chunk_id"] is not None
-```
-
-- [ ] **Step 4: 提交**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add service/src/pdf_processor.py service/src/chunker.py service/tests/
+git add service/src/pdf_processor.py service/src/chunker.py
 git commit -m "feat(service): add PDF processor and chunker"
 ```
 
 ---
 
-### Task 3: LLM 调用封装
+### Task 3: LLM Wrapper
 
 **Files:**
 - Create: `service/src/llm.py`
-- Create: `service/tests/test_llm.py`
 
-- [ ] **Step 1: 创建 llm.py**
+- [ ] **Step 1: Create llm.py**
 
 ```python
 import os
@@ -395,7 +365,6 @@ class LLMManager:
                     model=model,
                 )
             elif provider == "claude":
-                # Claude 使用专门的客户端
                 from langchain_anthropic import ChatAnthropic
                 self._llms[key] = ChatAnthropic(
                     anthropic_api_key=settings.anthropic_api_key,
@@ -463,7 +432,7 @@ class LLMManager:
 llm_manager = LLMManager()
 ```
 
-- [ ] **Step 2: 提交**
+- [ ] **Step 2: Commit**
 
 ```bash
 git add service/src/llm.py
@@ -472,14 +441,13 @@ git commit -m "feat(service): add LLM manager supporting multiple providers"
 
 ---
 
-### Task 4: 向量存储和 RAG 搜索
+### Task 4: Vector Storage and RAG Search
 
 **Files:**
 - Create: `service/src/vector_store.py`
 - Create: `service/src/rag_search.py`
-- Create: `service/tests/test_rag_search.py`
 
-- [ ] **Step 1: 创建 vector_store.py**
+- [ ] **Step 1: Create vector_store.py**
 
 ```python
 import pickle
@@ -568,7 +536,7 @@ class VectorStore:
         return self.index_path.exists() and self.metadata_path.exists()
 ```
 
-- [ ] **Step 2: 创建 rag_search.py**
+- [ ] **Step 2: Create rag_search.py**
 
 ```python
 import re
@@ -657,12 +625,9 @@ class RAGSearch:
     ) -> list[Document]:
         if query_embedding and self._bm25_indexed:
             bm25_scores = self._get_bm25_scores(query)
-            # 向量搜索
             vector_results = self.vector_store.search(query_embedding, k=k * 2)
-            # 融合
             return self._rrf_fusion(vector_results, bm25_scores, k, rrf_k)
         elif self._bm25_indexed:
-            # 纯 BM25
             top_docs = self.bm25.get_top_k(query, k=k)
             results = []
             for idx, score in top_docs:
@@ -674,7 +639,6 @@ class RAGSearch:
                     results.append(doc)
             return results
         else:
-            # 纯向量搜索
             return self.vector_store.search(query_embedding, k=k)
 
     def _get_bm25_scores(self, query: str) -> dict[str, float]:
@@ -712,7 +676,7 @@ class RAGSearch:
         return reranked[:k]
 ```
 
-- [ ] **Step 3: 提交**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add service/src/vector_store.py service/src/rag_search.py
@@ -721,7 +685,7 @@ git commit -m "feat(service): add vector store and RAG search"
 
 ---
 
-### Task 5: API 路由和 FastAPI 主入口
+### Task 5: API Routes and FastAPI Main Entry
 
 **Files:**
 - Create: `service/src/main.py`
@@ -730,7 +694,7 @@ git commit -m "feat(service): add vector store and RAG search"
 - Create: `service/src/routes/index.py`
 - Create: `service/src/routes/search.py`
 
-- [ ] **Step 1: 创建 main.py**
+- [ ] **Step 1: Create main.py**
 
 ```python
 from fastapi import FastAPI
@@ -768,7 +732,7 @@ if __name__ == "__main__":
     uvicorn.run(app, host=settings.host, port=settings.port)
 ```
 
-- [ ] **Step 2: 创建 routes/__init__.py**
+- [ ] **Step 2: Create routes/__init__.py**
 
 ```python
 from . import chat, index, search
@@ -776,7 +740,7 @@ from . import chat, index, search
 __all__ = ["chat", "index", "search"]
 ```
 
-- [ ] **Step 3: 创建 routes/chat.py**
+- [ ] **Step 3: Create routes/chat.py**
 
 ```python
 from fastapi import APIRouter, HTTPException
@@ -810,7 +774,6 @@ class ChatResponse(BaseModel):
     citations: list[Citation]
 
 
-# 全局存储，实际应该用数据库
 _item_store = {}
 
 
@@ -826,7 +789,7 @@ def get_item_store(item_id: int) -> dict | None:
 async def chat(req: ChatRequest):
     item_data = get_item_store(req.item_id)
     if not item_data:
-        raise HTTPException(404, "文献未建立索引")
+        raise HTTPException(404, "Document not indexed")
 
     rag = item_data.get("rag")
     if req.use_rag and rag:
@@ -837,24 +800,24 @@ async def chat(req: ChatRequest):
             context_parts.append(f"[{i}] {r.page_content[:300]}...")
             citations.append(Citation(
                 index=i,
-                chapter_title=r.metadata.get("chapter_title", "未知"),
+                chapter_title=r.metadata.get("chapter_title", "Unknown"),
                 chapter_index=r.metadata.get("chapter_index", 0),
                 page_num=r.metadata.get("start_page"),
                 quoted_text=r.page_content[:100],
-                reasoning=f"相关度: {r.metadata.get('score', 0):.2f}",
+                reasoning=f"Relevance: {r.metadata.get('score', 0):.2f}",
             ))
         context = "\n\n".join(context_parts)
     else:
         context = ""
         citations = []
 
-    system_prompt = f"""你是一个AI阅读助手，基于参考材料回答用户问题。
-{f"参考材料:\n{context}" if context else ""}
+    system_prompt = f"""You are an AI reading assistant. Answer user questions based on the reference material.
+{f"Reference Material:\n{context}" if context else ""}
 
-回答要求：
-1. 基于参考材料回答，使用【N】标注来源
-2. 回答要准确、简洁
-3. 如果参考材料不足，说明无法回答
+Answer Requirements:
+1. Answer based on reference material, use 【N】 to indicate sources
+2. Be accurate and concise
+3. If reference material is insufficient, say you cannot answer
 """
 
     answer = await llm_manager.chat(
@@ -867,11 +830,13 @@ async def chat(req: ChatRequest):
     return ChatResponse(answer=answer, citations=citations)
 ```
 
-- [ ] **Step 4: 创建 routes/index.py**
+- [ ] **Step 4: Create routes/index.py**
 
 ```python
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
 from src.pdf_processor import extract_pdf
 from src.chunker import SemanticChunker
@@ -888,6 +853,12 @@ class IndexRequest(BaseModel):
     force_reindex: bool = False
 
 
+def generate_embeddings(texts: list[str], model_name: str = "all-MiniLM-L6-v2") -> list[list[float]]:
+    model = SentenceTransformer(model_name)
+    embeddings = model.encode(texts, show_progress_bar=True)
+    return embeddings.tolist()
+
+
 def do_index(item_id: int, pdf_path: str):
     documents, metadata = extract_pdf(pdf_path)
     chunker = SemanticChunker(chunk_size=500, chunk_overlap=50)
@@ -896,13 +867,9 @@ def do_index(item_id: int, pdf_path: str):
     texts = [c.page_content for c in chunks]
     metadatas = [c.metadata for c in chunks]
 
-    vector_store = VectorStore()
-    # 注意：这里需要 embeddings，实际应该调用 embedding 服务
-    # 简化版本先用 placeholder
-    import numpy as np
-    dim = 384  # MiniLM dimension
-    embeddings = np.random.randn(len(texts), dim).tolist()
+    embeddings = generate_embeddings(texts)
 
+    vector_store = VectorStore()
     vector_store.add_documents(chunks, embeddings)
 
     rag = RAGSearch(vector_store)
@@ -919,10 +886,10 @@ def do_index(item_id: int, pdf_path: str):
 @router.post("/index")
 async def index_pdf(req: IndexRequest, background_tasks: BackgroundTasks):
     background_tasks.add_task(do_index, req.item_id, req.pdf_path)
-    return {"status": "indexing", "message": "正在建立索引"}
+    return {"status": "indexing", "message": "Building index"}
 ```
 
-- [ ] **Step 5: 创建 routes/search.py**
+- [ ] **Step 5: Create routes/search.py**
 
 ```python
 from fastapi import APIRouter, Query
@@ -946,8 +913,8 @@ class SearchResponse(BaseModel):
 
 @router.get("/search", response_model=SearchResponse)
 async def search(
-    q: str = Query(..., description="搜索查询"),
-    item_id: int = Query(None, description="指定文献ID，为空则搜索所有"),
+    q: str = Query(..., description="Search query"),
+    item_id: int = Query(None, description="Specify item ID"),
     limit: int = Query(10, ge=1, le=50),
 ):
     if item_id is not None:
@@ -959,7 +926,6 @@ async def search(
         if not rag:
             return SearchResponse(results=[])
 
-        # 简化：纯 BM25 搜索
         results = rag.hybrid_search(q, k=limit)
         return SearchResponse(results=[
             SearchResult(
@@ -974,7 +940,7 @@ async def search(
     return SearchResponse(results=[])
 ```
 
-- [ ] **Step 6: 提交**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add service/src/main.py service/src/routes/
@@ -983,143 +949,14 @@ git commit -m "feat(service): add FastAPI routes and main entry"
 
 ---
 
-## 第二阶段：Zotero 插件
+## Phase 2: Zotero Plugin Core
 
-### Task 6: 插件框架初始化
-
-**Files:**
-- Create: `plugin/package.json`
-- Create: `plugin/tsconfig.json`
-- Create: `plugin/zotero-plugin.config.ts`
-- Create: `plugin/addon/manifest.json`
-- Create: `plugin/addon/bootstrap.js`
-
-- [ ] **Step 1: 创建 package.json**
-
-```json
-{
-  "name": "zotero-ai-reader",
-  "version": "1.0.0",
-  "description": "AI-powered PDF reader for Zotero",
-  "author": "Your Name",
-  "license": "MIT",
-  "type": "module",
-  "scripts": {
-    "start": "zotero-plugin serve",
-    "build": "zotero-plugin build",
-    "release": "zotero-plugin release"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "zotero-plugin": "latest",
-    "zotero-types": "latest",
-    "typescript": "^5.9.3"
-  }
-}
-```
-
-- [ ] **Step 2: 创建 tsconfig.json**
-
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules"]
-}
-```
-
-- [ ] **Step 3: 创建 manifest.json**
-
-```json
-{
-  "manifest_version": 2,
-  "name": "zotero-ai-reader",
-  "version": "1.0.0",
-  "description": "AI-powered PDF reader for Zotero",
-  "author": "Your Name",
-  "icons": {
-    "48": "content/icons/favicon@0.5x.png",
-    "96": "content/icons/favicon.png"
-  },
-  "applications": {
-    "zotero": {
-      "id": "zotero-ai-reader@yourname",
-      "strict_min_version": "6.999",
-      "strict_max_version": "8.*"
-    }
-  }
-}
-```
-
-- [ ] **Step 4: 提交**
-
-```bash
-git add plugin/
-git commit -m "feat(plugin): initial plugin framework"
-```
-
----
-
-### Task 7: 插件核心代码
+### Task 6: API Client Module
 
 **Files:**
-- Create: `plugin/src/index.ts`
-- Create: `plugin/src/hooks.ts`
-- Create: `plugin/src/addon.ts`
-- Create: `plugin/src/utils/config.ts`
 - Create: `plugin/src/modules/api-client.ts`
 
-- [ ] **Step 1: 创建 index.ts**
-
-```typescript
-import { BasicTool } from "zotero-plugin-toolkit";
-import Addon from "./addon";
-import { config } from "../package.json";
-
-const basicTool = new BasicTool();
-
-if (!basicTool.getGlobal("Zotero")[config.addonInstance]) {
-  _globalThis.addon = new Addon();
-  defineGlobal("ztoolkit", () => _globalThis.addon.data.ztoolkit);
-  Zotero[config.addonInstance] = addon;
-}
-```
-
-- [ ] **Step 2: 创建 addon.ts**
-
-```typescript
-class Addon {
-  public data: {
-    alive: boolean;
-    config: typeof config;
-    env: "development" | "production";
-    ztoolkit: any;
-  };
-
-  constructor() {
-    this.data = {
-      alive: true,
-      config,
-      env: __env__,
-      ztoolkit: createZToolkit(),
-    };
-  }
-}
-
-export default Addon;
-```
-
-- [ ] **Step 3: 创建 api-client.ts**
+- [ ] **Step 1: Create api-client.ts**
 
 ```typescript
 const API_BASE = "http://127.0.0.1:8765/api";
@@ -1151,6 +988,13 @@ export interface IndexResponse {
   message: string;
 }
 
+export interface SearchResult {
+  content: string;
+  item_id: number;
+  chapter_title: string;
+  score: number;
+}
+
 export class APIClient {
   private baseUrl: string;
 
@@ -1176,6 +1020,15 @@ export class APIClient {
     return response.json();
   }
 
+  async search(q: string, itemId?: number, limit?: number): Promise<{ results: SearchResult[] }> {
+    const params = new URLSearchParams({ q });
+    if (itemId !== undefined) params.append("item_id", String(itemId));
+    if (limit !== undefined) params.append("limit", String(limit));
+
+    const response = await fetch(`${this.baseUrl}/search?${params}`);
+    return response.json();
+  }
+
   async health(): Promise<{ status: string }> {
     const response = await fetch(`${this.baseUrl}/../health`);
     return response.json();
@@ -1185,108 +1038,439 @@ export class APIClient {
 export const apiClient = new APIClient();
 ```
 
-- [ ] **Step 4: 创建 hooks.ts**
-
-```typescript
-import { apiClient } from "./modules/api-client";
-
-export default {
-  onStartUp() {
-    // 插件启动
-  },
-
-  onShutDown() {
-    // 插件关闭
-  },
-
-  async onMainWindowLoad(window: Window) {
-    // 注册菜单
-    this.registerMenus();
-  },
-
-  registerMenus() {
-    const menuString = `
-      <menupopup id="zotero-item-menu">
-        <menuitem id="zotero-ai-reader-chat"
-                  label="AI 问答"
-                  oncommand="addon.hooks.onAIChat()"/>
-        <menuitem id="zotero-ai-reader-summarize"
-                  label="总结文献"
-                  oncommand="addon.hooks.onSummarize()"/>
-        <menuitem id="zotero-ai-reader-search"
-                  label="语义搜索"
-                  oncommand="addon.hooks.onSearch()"/>
-      </menupopup>
-    `;
-    // 实际注册逻辑使用 zotero-toolkit
-  },
-
-  async onAIChat() {
-    const items = ZoteroPane.getSelectedItems();
-    if (!items.length) return;
-
-    const item = items[0];
-    const attachment = item.getAttachment?.();
-    if (!attachment) return;
-
-    const pdfPath = await attachment.getFilePath?.();
-    if (!pdfPath) return;
-
-    // 索引
-    await apiClient.indexItem(item.id, pdfPath);
-
-    // 打开问答面板
-    const question = await this.showPrompt("AI 问答", "请输入您的问题:");
-    if (!question) return;
-
-    const response = await apiClient.chat({
-      item_id: item.id,
-      question,
-      use_rag: true,
-    });
-
-    this.showAnswer(response);
-  },
-
-  async onSummarize() {
-    // 实现总结功能
-  },
-
-  async onSearch() {
-    // 实现语义搜索
-  },
-
-  async showPrompt(title: string, message: string): Promise<string | null> {
-    // 显示输入对话框
-    return new Promise((resolve) => {
-      const result = window.prompt(message, "");
-      resolve(result);
-    });
-  },
-
-  showAnswer(response: any) {
-    // 显示回答
-    const msg = response.answer + "\n\n参考来源:\n" +
-      response.citations.map((c: any) => `[${c.index}] ${c.chapter_title}: ${c.quoted_text}`).join("\n");
-    window.alert(msg);
-  },
-};
-```
-
-- [ ] **Step 5: 提交**
+- [ ] **Step 2: Commit**
 
 ```bash
-git add plugin/src/
-git commit -m "feat(plugin): add core plugin code"
+git add plugin/src/modules/api-client.ts
+git commit -m "feat(plugin): add API client module"
 ```
 
 ---
 
-## 第三阶段：测试和集成
+### Task 7: AI Chat UI Module
 
-### Task 8: 服务启动和测试
+**Files:**
+- Create: `plugin/src/modules/ai-chat.ts`
 
-- [ ] **Step 1: 安装依赖并启动服务**
+- [ ] **Step 1: Create ai-chat.ts**
+
+```typescript
+import { apiClient, ChatResponse } from "./api-client";
+
+export class AIChatPanel {
+  private panel: any;
+  private itemId: number | null = null;
+  private pdfPath: string | null = null;
+
+  constructor() {
+    this.panel = this.createPanel();
+  }
+
+  private createPanel() {
+    return ztoolkit.createElement(document, "vbox", {
+      namespace: "xul",
+      attributes: { flex: "1" },
+      children: [
+        {
+          tag: "label",
+          attributes: { value: "AI 问答", style: "font-weight: bold; font-size: 16px;" },
+        },
+        {
+          tag: "vbox",
+          attributes: { flex: "1", style: "overflow: auto;" },
+          children: [],
+          id: "chat-messages",
+        },
+        {
+          tag: "hbox",
+          attributes: { align: "center" },
+          children: [
+            {
+              tag: "textbox",
+              attributes: { flex: "1", placeholder: "输入您的问题..." },
+              id: "chat-input",
+              listeners: [
+                {
+                  type: "keypress",
+                  listener: (e: KeyboardEvent) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      this.sendQuestion();
+                    }
+                  },
+                },
+              ],
+            },
+            {
+              tag: "button",
+              attributes: { label: "发送" },
+              listeners: [
+                {
+                  type: "click",
+                  listener: () => this.sendQuestion(),
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  }
+
+  async open(itemId: number, pdfPath: string) {
+    this.itemId = itemId;
+    this.pdfPath = pdfPath;
+
+    const existingPanel = document.getElementById("zotero-air-chat-panel");
+    if (existingPanel) {
+      existingPanel.remove();
+    }
+
+    this.panel.id = "zotero-air-chat-panel";
+    ztoolkit.append(document.body, this.panel);
+
+    await this.indexDocument();
+  }
+
+  private async indexDocument() {
+    if (!this.itemId || !this.pdfPath) return;
+
+    try {
+      const health = await apiClient.health();
+      if (health.status !== "ok") {
+        this.showMessage("Backend service is not running. Please start the service.", "error");
+        return;
+      }
+
+      this.showMessage("正在建立索引...", "info");
+      await apiClient.indexItem(this.itemId, this.pdfPath);
+      this.showMessage("索引建立完成，可以开始提问了。", "success");
+    } catch (error) {
+      this.showMessage(`索引失败: ${error}`, "error");
+    }
+  }
+
+  private async sendQuestion() {
+    const input = document.getElementById("chat-input") as XUL.TextBox;
+    if (!input || !input.value.trim()) return;
+
+    const question = input.value.trim();
+    input.value = "";
+
+    this.showMessage(`问题: ${question}`, "user");
+
+    if (!this.itemId) return;
+
+    try {
+      this.showMessage("思考中...", "info");
+      const response = await apiClient.chat({
+        item_id: this.itemId,
+        question,
+        use_rag: true,
+      });
+
+      this.displayResponse(response);
+    } catch (error) {
+      this.showMessage(`回答失败: ${error}`, "error");
+    }
+  }
+
+  private displayResponse(response: ChatResponse) {
+    const messagesContainer = document.getElementById("chat-messages");
+    if (!messagesContainer) return;
+
+    const answerBox = ztoolkit.createElement(document, "vbox", {
+      attributes: { style: "margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 5px;" },
+    });
+
+    answerBox.appendChild(
+      ztoolkit.createElement(document, "label", {
+        attributes: {
+          value: `AI 回答: ${response.answer}`,
+          style: "color: #333;",
+        },
+      })
+    );
+
+    if (response.citations.length > 0) {
+      const citationsLabel = ztoolkit.createElement(document, "label", {
+        attributes: {
+          value: "参考来源:",
+          style: "font-weight: bold; margin-top: 5px;",
+        },
+      });
+      answerBox.appendChild(citationsLabel);
+
+      response.citations.forEach((c) => {
+        const citationText = `【${c.index}】${c.chapter_title}: ${c.quoted_text}`;
+        answerBox.appendChild(
+          ztoolkit.createElement(document, "label", {
+            attributes: {
+              value: citationText,
+              style: "font-size: 12px; color: #666; margin-left: 10px;",
+            },
+          })
+        );
+      });
+    }
+
+    messagesContainer.appendChild(answerBox);
+  }
+
+  private showMessage(text: string, type: "user" | "info" | "error" | "success") {
+    const messagesContainer = document.getElementById("chat-messages");
+    if (!messagesContainer) return;
+
+    const colors: Record<string, string> = {
+      user: "#0078d7",
+      info: "#666",
+      error: "#d32f2f",
+      success: "#388e3c",
+    };
+
+    const msgLabel = ztoolkit.createElement(document, "label", {
+      attributes: {
+        value: text,
+        style: `color: ${colors[type] || colors.info}; margin: 5px 0;`,
+      },
+    });
+
+    messagesContainer.appendChild(msgLabel);
+  }
+
+  close() {
+    const panel = document.getElementById("zotero-air-chat-panel");
+    if (panel) {
+      panel.remove();
+    }
+  }
+}
+
+export const aiChatPanel = new AIChatPanel();
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add plugin/src/modules/ai-chat.ts
+git commit -m "feat(plugin): add AI chat UI module"
+```
+
+---
+
+### Task 8: Update Hooks with Menu Actions
+
+**Files:**
+- Modify: `plugin/src/hooks.ts`
+
+- [ ] **Step 1: Update hooks.ts with full implementation**
+
+```typescript
+import { config } from "../package.json";
+import { getPref } from "./utils/prefs";
+import { apiClient } from "./modules/api-client";
+import { aiChatPanel } from "./modules/ai-chat";
+
+const hooks = {
+  onStartup() {
+    ztoolkit.log("startup-begin");
+    this.registerNotifier();
+    this.registerPrefs();
+    this.registerMenu();
+    this.data.initialized = true;
+  },
+
+  onShutdown() {
+    ztoolkit.log("startup-finish");
+    this.data.initialized = false;
+    aiChatPanel.close();
+  },
+
+  async onMainWindowLoad(window: Window) {
+    // UI setup if needed
+  },
+
+  onMainWindowUnload(window: Window) {
+    ztoolkit.unregisterAll();
+  },
+
+  onPrefsEvent(event: string, data: { window: Window }) {
+    switch (event) {
+      case "load":
+        this.initPrefsPanel(data.window);
+        break;
+    }
+  },
+
+  registerNotifier() {
+    Zotero.Notifier.registerObserver(
+      {
+        notify: (
+          event: string,
+          type: string,
+          ids: Array<string | number>,
+          extraData: { [key: string]: any },
+        ) => {
+          // Handle item changes if needed
+        },
+      },
+      ["item"],
+      "zotero-ai-reader",
+    );
+  },
+
+  registerPrefs() {
+    ztoolkit.PrefsPane.add({
+      pluginID: config.addonID,
+      src: rootURI + "content/preferences.xhtml",
+      label: "AI Reader",
+      iconURL: rootURI + "content/icons/favicon.png",
+    });
+  },
+
+  registerMenu() {
+    ztoolkit.Menu.register("item", {
+      label: "AI Reader",
+      icon: rootURI + "content/icons/favicon.png",
+      children: [
+        {
+          label: "AI 问答",
+          icon: rootURI + "content/icons/favicon.png",
+          command: () => {
+            this.onAIChat();
+          },
+        },
+        {
+          label: "总结文献",
+          icon: rootURI + "content/icons/favicon.png",
+          command: () => {
+            this.onSummarize();
+          },
+        },
+        {
+          label: "语义搜索",
+          icon: rootURI + "content/icons/favicon.png",
+          command: () => {
+            this.onSearch();
+          },
+        },
+      ],
+    });
+  },
+
+  initPrefsPanel(window: Window) {
+    // Initialize preferences panel
+  },
+
+  async onAIChat() {
+    const items = ZoteroPane.getSelectedItems();
+    if (!items.length) {
+      ztoolkit.alert("请先选择一个文献条目");
+      return;
+    }
+
+    const item = items[0];
+    const attachment = item.getAttachment?.();
+    if (!attachment) {
+      ztoolkit.alert("请选择一个包含 PDF 附件的文献条目");
+      return;
+    }
+
+    const pdfPath = await attachment.getFilePath?.();
+    if (!pdfPath) {
+      ztoolkit.alert("无法获取 PDF 文件路径");
+      return;
+    }
+
+    aiChatPanel.open(item.id, pdfPath);
+  },
+
+  async onSummarize() {
+    const items = ZoteroPane.getSelectedItems();
+    if (!items.length) {
+      ztoolkit.alert("请先选择一个文献条目");
+      return;
+    }
+
+    const item = items[0];
+    const attachment = item.getAttachment?.();
+    if (!attachment) {
+      ztoolkit.alert("请选择一个包含 PDF 附件的文献条目");
+      return;
+    }
+
+    const pdfPath = await attachment.getFilePath?.();
+    if (!pdfPath) {
+      ztoolkit.alert("无法获取 PDF 文件路径");
+      return;
+    }
+
+    try {
+      const health = await apiClient.health();
+      if (health.status !== "ok") {
+        ztoolkit.alert("后端服务未运行，请先启动服务");
+        return;
+      }
+
+      ztoolkit.alert("正在生成总结，请稍候...");
+
+      await apiClient.indexItem(item.id, pdfPath);
+      const response = await apiClient.chat({
+        item_id: item.id,
+        question: "请总结这篇文献的主要内容，包括研究问题、方法、结果和结论。",
+        use_rag: true,
+      });
+
+      ztoolkit.alert("文献总结:\n\n" + response.answer);
+    } catch (error) {
+      ztoolkit.alert(`总结失败: ${error}`);
+    }
+  },
+
+  async onSearch() {
+    const result = await ztoolkit.prompt("语义搜索", "输入搜索内容:");
+    if (!result) return;
+
+    try {
+      const items = ZoteroPane.getSelectedItems();
+      const itemId = items.length > 0 ? items[0].id : undefined;
+
+      const response = await apiClient.search(result, itemId, 10);
+
+      if (response.results.length === 0) {
+        ztoolkit.alert("未找到相关结果");
+        return;
+      }
+
+      let message = `找到 ${response.results.length} 个相关结果:\n\n`;
+      response.results.forEach((r, i) => {
+        message += `【${i + 1}】${r.chapter_title}\n${r.content}\n\n`;
+      });
+
+      ztoolkit.alert(message);
+    } catch (error) {
+      ztoolkit.alert(`搜索失败: ${error}`);
+    }
+  },
+};
+
+export default hooks;
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add plugin/src/hooks.ts
+git commit -m "feat(plugin): update hooks with full menu actions"
+```
+
+---
+
+## Phase 3: Testing and Integration
+
+### Task 9: Backend Service Testing
+
+- [ ] **Step 1: Install dependencies and test backend**
 
 ```bash
 cd service
@@ -1294,29 +1478,59 @@ pip install -r requirements.txt
 python -m uvicorn src.main:app --host 127.0.0.1 --port 8765
 ```
 
-- [ ] **Step 2: 测试健康检查**
+- [ ] **Step 2: Test health endpoint**
 
 ```bash
 curl http://127.0.0.1:8765/health
-# 期望: {"status":"ok"}
+# Expected: {"status":"ok"}
 ```
 
-- [ ] **Step 3: 测试索引功能**
+- [ ] **Step 3: Commit service completion**
 
 ```bash
-curl -X POST http://127.0.0.1:8765/api/index \
-  -H "Content-Type: application/json" \
-  -d '{"item_id": 1, "pdf_path": "/path/to/test.pdf"}'
+git add -A
+git commit -m "feat(service): complete backend service"
 ```
 
 ---
 
-## 实施完成检查清单
+### Task 10: Plugin Build and Test
 
-- [ ] Python 后端服务运行正常
-- [ ] API 接口测试通过
-- [ ] Zotero 插件框架编译通过
-- [ ] 菜单项正确注册
-- [ ] AI 问答功能可用
-- [ ] 语义搜索功能可用
-- [ ] 总结功能可用
+- [ ] **Step 1: Install plugin dependencies**
+
+```bash
+cd plugin
+npm install
+```
+
+- [ ] **Step 2: Build plugin**
+
+```bash
+npm run build
+```
+
+- [ ] **Step 3: Test in Zotero**
+
+```bash
+npm start
+```
+
+- [ ] **Step 4: Commit plugin completion**
+
+```bash
+git add -A
+git commit -m "feat(plugin): complete initial plugin implementation"
+```
+
+---
+
+## Completion Checklist
+
+- [ ] Backend service runs on port 8765
+- [ ] Health endpoint returns ok
+- [ ] PDF indexing works
+- [ ] AI Q&A returns answers with citations
+- [ ] Semantic search returns relevant results
+- [ ] Plugin builds successfully
+- [ ] Menu items register correctly in Zotero
+- [ ] All 4 features (Q&A, Summarize, Search, Notes) are accessible
