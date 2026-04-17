@@ -59,6 +59,10 @@ jobs:
           cd .scaffold/build/addon
           zip -r ../../zotero-ai-reader.xpi .
           cd ../..
+          ls -la .scaffold/build/
+
+      - name: Verify xpi exists
+        run: ls -la .scaffold/build/zotero-ai-reader.xpi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
