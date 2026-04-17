@@ -42,6 +42,7 @@ jobs:
           sed -i 's/__homepage__/https:\/\/github.com\/Callioper\/zotero-aireader/g' addon/manifest.json
           sed -i 's/__author__/Callioper/g' addon/manifest.json
           sed -i 's/__addonID__/zotero-ai-reader@callioper/g' addon/manifest.json
+          sed -i 's/__updateURL__/https:\/\/github.com\/Callioper\/zotero-aireader\/releases\/download\/release\/update.json/g' addon/manifest.json
 
       - name: Copy addon files
         run: |
