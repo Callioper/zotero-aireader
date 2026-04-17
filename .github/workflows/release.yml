@@ -57,10 +57,9 @@ jobs:
       - name: Create xpi archive
         run: |
           ls -la .scaffold/build/addon/
-          cd .scaffold/build/addon && zip -r ../../zotero-ai-reader.xpi . && ls -la ../../
-
-      - name: Verify xpi exists
-        run: ls -la .scaffold/build/zotero-ai-reader.xpi
+          cd .scaffold/build/addon
+          zip -r ../zotero-ai-reader.xpi .
+          ls -la ..
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
