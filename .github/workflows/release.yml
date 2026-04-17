@@ -69,20 +69,62 @@ jobs:
           name: plugin-build
           path: .scaffold/build/zotero-ai-reader.xpi
 
+      - name: Create update.json
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION=${TAG_NAME#v}
+          OWNER=Callioper
+          REPO=zotero-aireader
+          HASH=$(sha256sum .scaffold/build/zotero-ai-reader.xpi | cut -d' ' -f1)
+          cat > update.json << EOF
+          {
+            "addons": {
+              "zotero-ai-reader@callioper": {
+                "updates": [
+                  {
+                    "version": "$VERSION",
+                    "update_link": "https://github.com/$OWNER/$REPO/releases/download/$TAG_NAME/zotero-ai-reader.xpi",
+                    "update_hash": "sha256:$HASH",
+                    "applications": {
+                      "zotero": {
+                        "strict_min_version": "6.999",
+                        "strict_max_version": "9.*"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+          EOF
+
+      - name: Upload update.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-json
+          path: update.json
+
   release:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download artifact
+      - name: Download plugin artifact
         uses: actions/download-artifact@v4
         with:
           name: plugin-build
           path: .
 
+      - name: Download update.json artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: update-json
+          path: .
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: "*.xpi"
+          files: "*.xpi" "update.json"
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
