@@ -12,4 +12,5 @@ tabpanel-reader-tab-label = Reader Tab
 pref-title = AI Reader Settings
 pref-enable = Enable AI Reader
 pref-input = Input
+pref-api-url = API URL
 pref-help = { name } v{ version } ({ time })

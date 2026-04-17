@@ -1,4 +1,14 @@
-const API_BASE = "http://127.0.0.1:8765/api";
+const DEFAULT_API_BASE = "http://127.0.0.1:8765/api";
+
+function getApiBase(): string {
+  try {
+    const prefKey = "extensions.zotero-zoteroAIRreader.apiUrl";
+    const url = Zotero.Prefs.get(prefKey, true);
+    return url || DEFAULT_API_BASE;
+  } catch {
+    return DEFAULT_API_BASE;
+  }
+}
 
 export interface ChatRequest {
   item_id: number;
@@ -35,10 +45,8 @@ export interface SearchResult {
 }
 
 export class APIClient {
-  private baseUrl: string;
-
-  constructor(baseUrl: string = API_BASE) {
-    this.baseUrl = baseUrl;
+  private getBaseUrl(): string {
+    return getApiBase();
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
@@ -50,7 +58,7 @@ export class APIClient {
   }
 
   async indexItem(itemId: number, pdfPath: string): Promise<IndexResponse> {
-    const response = await fetch(`${this.baseUrl}/index`, {
+    const response = await fetch(`${this.getBaseUrl()}/index`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ item_id: itemId, pdf_path: pdfPath }),
@@ -59,7 +67,7 @@ export class APIClient {
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    const response = await fetch(`${this.baseUrl}/chat`, {
+    const response = await fetch(`${this.getBaseUrl()}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -72,12 +80,14 @@ export class APIClient {
     if (itemId !== undefined) params.append("item_id", String(itemId));
     if (limit !== undefined) params.append("limit", String(limit));
 
-    const response = await fetch(`${this.baseUrl}/search?${params}`);
+    const response = await fetch(`${this.getBaseUrl()}/search?${params}`);
     return this.handleResponse(response);
   }
 
   async health(): Promise<{ status: string }> {
-    const response = await fetch(`${this.baseUrl.replace('/api', '')}/health`);
+    const base = this.getBaseUrl();
+    const healthUrl = base.replace('/api', '') + '/health';
+    const response = await fetch(healthUrl);
     return this.handleResponse(response);
   }
 }

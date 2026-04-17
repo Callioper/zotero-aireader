@@ -51,33 +51,46 @@ const hooks = {
   },
 
   registerMenu() {
-    ztoolkit.Menu.register("item", {
-      label: "AI Reader",
-      icon: rootURI + "content/icons/favicon.png",
-      children: [
-        {
-          label: "AI 问答",
-          icon: rootURI + "content/icons/favicon.png",
-          command: () => {
-            this.onAIChat();
-          },
-        },
-        {
-          label: "总结文献",
-          icon: rootURI + "content/icons/favicon.png",
-          command: () => {
-            this.onSummarize();
-          },
-        },
-        {
-          label: "语义搜索",
-          icon: rootURI + "content/icons/favicon.png",
-          command: () => {
-            this.onSearch();
-          },
-        },
-      ],
+    const menuPopup = document.getElementById("item-context-menu");
+    if (!menuPopup) {
+      ztoolkit.log("item-context-menu not found");
+      return;
+    }
+
+    const submenu = ztoolkit.createElement(document, "menu", {
+      namespace: "xul",
+      attributes: {
+        label: "AI Reader",
+        id: "zotero-air-reader-menu",
+      },
     });
+
+    const menupopup = ztoolkit.createElement(document, "menupopup", {
+      namespace: "xul",
+    });
+
+    const menuItems = [
+      { label: "AI 问答", command: () => this.onAIChat() },
+      { label: "总结文献", command: () => this.onSummarize() },
+      { label: "语义搜索", command: () => this.onSearch() },
+    ];
+
+    for (const item of menuItems) {
+      const menuitem = ztoolkit.createElement(document, "menuitem", {
+        namespace: "xul",
+        attributes: { label: item.label },
+        listeners: [
+          {
+            type: "command",
+            listener: item.command,
+          },
+        ],
+      });
+      menupopup.appendChild(menuitem);
+    }
+
+    submenu.appendChild(menupopup);
+    menuPopup.appendChild(submenu);
   },
 
   async onAIChat() {
