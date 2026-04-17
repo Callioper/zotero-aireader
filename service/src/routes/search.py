@@ -19,8 +19,8 @@ class SearchResponse(BaseModel):
 
 @router.get("/search", response_model=SearchResponse)
 async def search(
-    q: str = Query(..., description="搜索查询"),
-    item_id: int = Query(None, description="指定文献ID，为空则搜索所有"),
+    q: str = Query(..., description="Search query"),
+    item_id: int = Query(None, description="Specify item ID"),
     limit: int = Query(10, ge=1, le=50),
 ):
     if item_id is not None:

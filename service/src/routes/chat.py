@@ -44,7 +44,7 @@ def get_item_store(item_id: int) -> dict | None:
 async def chat(req: ChatRequest):
     item_data = get_item_store(req.item_id)
     if not item_data:
-        raise HTTPException(404, "文献未建立索引")
+        raise HTTPException(404, "Document not indexed")
 
     rag = item_data.get("rag")
     if req.use_rag and rag:
@@ -55,24 +55,24 @@ async def chat(req: ChatRequest):
             context_parts.append(f"[{i}] {r.page_content[:300]}...")
             citations.append(Citation(
                 index=i,
-                chapter_title=r.metadata.get("chapter_title", "未知"),
+                chapter_title=r.metadata.get("chapter_title", "Unknown"),
                 chapter_index=r.metadata.get("chapter_index", 0),
                 page_num=r.metadata.get("start_page"),
                 quoted_text=r.page_content[:100],
-                reasoning=f"相关度: {r.metadata.get('score', 0):.2f}",
+                reasoning=f"Relevance: {r.metadata.get('score', 0):.2f}",
             ))
         context = "\n\n".join(context_parts)
     else:
         context = ""
         citations = []
 
-    system_prompt = """你是一个AI阅读助手，基于参考材料回答用户问题。
-""" + (f"参考材料:\n{context}" if context else "") + """
+    system_prompt = f"""You are an AI reading assistant. Answer user questions based on the reference material.
+{f"Reference Material:\n{context}" if context else ""}
 
-回答要求：
-1. 基于参考材料回答，使用【N】标注来源
-2. 回答要准确、简洁
-3. 如果参考材料不足，说明无法回答
+Answer Requirements:
+1. Answer based on reference material, use 【N】 to indicate sources
+2. Be accurate and concise
+3. If reference material is insufficient, say you cannot answer
 """
 
     answer = await llm_manager.chat(

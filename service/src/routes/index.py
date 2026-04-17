@@ -1,5 +1,7 @@
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
 from src.pdf_processor import extract_pdf
 from src.chunker import SemanticChunker
@@ -16,6 +18,12 @@ class IndexRequest(BaseModel):
     force_reindex: bool = False
 
 
+def generate_embeddings(texts: list[str], model_name: str = "all-MiniLM-L6-v2") -> list[list[float]]:
+    model = SentenceTransformer(model_name)
+    embeddings = model.encode(texts, show_progress_bar=True)
+    return embeddings.tolist()
+
+
 def do_index(item_id: int, pdf_path: str):
     documents, metadata = extract_pdf(pdf_path)
     chunker = SemanticChunker(chunk_size=500, chunk_overlap=50)
@@ -24,11 +32,9 @@ def do_index(item_id: int, pdf_path: str):
     texts = [c.page_content for c in chunks]
     metadatas = [c.metadata for c in chunks]
 
-    vector_store = VectorStore()
-    import numpy as np
-    dim = 384
-    embeddings = np.random.randn(len(texts), dim).tolist()
+    embeddings = generate_embeddings(texts)
 
+    vector_store = VectorStore()
     vector_store.add_documents(texts, embeddings, metadatas)
 
     rag = RAGSearch(vector_store)
@@ -45,4 +51,4 @@ def do_index(item_id: int, pdf_path: str):
 @router.post("/index")
 async def index_pdf(req: IndexRequest, background_tasks: BackgroundTasks):
     background_tasks.add_task(do_index, req.item_id, req.pdf_path)
-    return {"status": "indexing", "message": "正在建立索引"}
+    return {"status": "indexing", "message": "Building index"}
