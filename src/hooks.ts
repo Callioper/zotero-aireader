@@ -8,7 +8,6 @@ const hooks = {
     ztoolkit.log("startup-begin");
     this.registerNotifier();
     this.registerPrefs();
-    this.registerMenu();
   },
 
   onShutdown() {
@@ -17,7 +16,7 @@ const hooks = {
   },
 
   async onMainWindowLoad(window: Window) {
-    // UI setup if needed
+    this.registerMenu();
   },
 
   onMainWindowUnload(window: Window) {
