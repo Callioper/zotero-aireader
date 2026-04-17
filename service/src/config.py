@@ -26,6 +26,4 @@ class Settings(BaseSettings):
     db_path: Path = Path("data.db")
 
 
-settings = Settings()
-settings.vector_store_path.mkdir(parents=True, exist_ok=True)
-settings.db_path.parent.mkdir(parents=True, exist_ok=True)
+

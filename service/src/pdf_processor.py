@@ -24,7 +24,7 @@ class PDFProcessor:
         chapters = []
         for i, item in enumerate(toc):
             level = item[0]
-            title = item[1].strip() if len(item) > 1 else f"章节{i+1}"
+            title = item[1].strip() if len(item) > 1 else f"Chapter {i+1}"
             page_num = item[2] - 1 if len(item) > 2 else 0
             chapters.append({"level": level, "title": title, "page": page_num})
         return chapters
@@ -35,7 +35,7 @@ class PDFProcessor:
 
         toc = self.extract_toc()
         if not toc:
-            return [{"title": "全文", "start_page": 0, "end_page": len(self.doc) - 1, "text": ""}]
+            return [{"title": "Full Text", "start_page": 0, "end_page": len(self.doc) - 1, "text": ""}]
 
         chapters = []
         for i, item in enumerate(toc):
@@ -80,7 +80,7 @@ def extract_pdf(pdf_path: str | Path) -> tuple[list[Document], dict]:
             page_content=chapter.get("text", ""),
             metadata={
                 "chapter_index": i,
-                "chapter_title": chapter.get("title", f"第{i+1}章"),
+                "chapter_title": chapter.get("title", f"Chapter {i+1}"),
                 "chapter_level": chapter.get("level", 1),
                 "start_page": chapter.get("start_page", 0),
                 "end_page": chapter.get("end_page", 0),

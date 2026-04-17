@@ -6,7 +6,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 class ChineseTextSplitter(RecursiveCharacterTextSplitter):
     def __init__(self, separators: list[str] | None = None, **kwargs):
         if separators is None:
-            separators = ["\n\n", "\n", "。", "！", "？", "；", "，", "、", " ", ""]
+            separators = ["\n\n", "\n", ". ", "。", "！", "？", "；", "，", "、", " "]
         super().__init__(separators=separators, **kwargs)
 
 
