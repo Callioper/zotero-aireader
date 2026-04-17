@@ -27,6 +27,7 @@ jobs:
           mkdir -p .scaffold/build/addon/content/scripts
           ./node_modules/.bin/esbuild src/index.ts \
             --bundle \
+            --format=esm \
             --target=firefox115 \
             --outfile=.scaffold/build/addon/content/scripts/zoteroAIRreader.js \
             --define:__env='"production"' \
