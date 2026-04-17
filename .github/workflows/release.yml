@@ -23,7 +23,13 @@ jobs:
         run: npm install
 
       - name: Build plugin
-        run: npm run build
+        run: |
+          ./node_modules/.bin/esbuild src/index.ts \
+            --bundle \
+            --target=firefox115 \
+            --outfile=.scaffold/build/addon/content/scripts/zoteroAIRreader.js \
+            --define:__env='"production"' \
+            --external:zotero-plugin-toolkit
 
       - name: Process manifest.json
         run: |
