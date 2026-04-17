@@ -27,10 +27,11 @@ jobs:
           mkdir -p .scaffold/build/addon/content/scripts
           ./node_modules/.bin/esbuild src/index.ts \
             --bundle \
-            --format=cjs \
+            --format=iife \
             --target=firefox115 \
             --outfile=.scaffold/build/addon/content/scripts/zoteroAIRreader.js \
-            --define:__env='"production"'
+            --define:__env='"production"' \
+            --global-name=_globalThis
 
       - name: Process manifest.json
         env:
