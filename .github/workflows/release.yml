@@ -23,19 +23,10 @@ jobs:
         run: npm install
 
       - name: Prepare build directory
-        run: |
-          mkdir -p .scaffold/build/addon/content/scripts
-          mkdir -p .scaffold/build/src
-          mkdir -p .scaffold/build/src/modules
-          mkdir -p .scaffold/build/src/utils
+        run: mkdir -p .scaffold/build/addon/content/scripts
 
       - name: Build TypeScript with esbuild
-        run: |
-          npx esbuild src/index.ts \
-            --bundle \
-            --target firefox115 \
-            --outfile=.scaffold/build/addon/content/scripts/zoteroAIRreader.js \
-            --define:__env='"production"'
+        run: node ./node_modules/esbuild/bin/esbuild src/index.ts --bundle --target=firefox115 --outfile=.scaffold/build/addon/content/scripts/zoteroAIRreader.js --define:__env='"production"'
 
       - name: Process manifest.json
         run: |
@@ -45,7 +36,6 @@ jobs:
           sed -i 's/__homepage__/https:\/\/github.com\/Callioper\/zotero-aireader/g' addon/manifest.json
           sed -i 's/__author__/Callioper/g' addon/manifest.json
           sed -i 's/__addonID__/zotero-ai-reader@callioper/g' addon/manifest.json
-          sed -i 's/__updateURL__/https:\/\/github.com\/Callioper\/zotero-aireader\/releases\/download\/release\/update.json/g' addon/manifest.json
           echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
 
       - name: Copy addon files
@@ -57,7 +47,7 @@ jobs:
           cp addon/prefs.js .scaffold/build/addon/
 
       - name: Show build output
-        run: ls -la .scaffold/build/addon/
+        run: ls -la .scaffold/build/addon/content/scripts/
 
       - name: Create xpi archive
         run: |

@@ -25,8 +25,9 @@
   },
   "dependencies": {},
   "devDependencies": {
+    "esbuild": "^0.21.0",
+    "typescript": "^5.9.3",
     "zotero-plugin": "latest",
-    "zotero-types": "latest",
-    "typescript": "^5.9.3"
+    "zotero-types": "latest"
   }
 }
