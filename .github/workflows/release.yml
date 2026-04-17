@@ -33,14 +33,15 @@ jobs:
             --external:zotero-plugin-toolkit
 
       - name: Process manifest.json
+        env:
+          TAG_NAME: ${{ github.ref_name }}
         run: |
           sed -i 's/__addonName__/Zotero AI Reader/g' addon/manifest.json
-          sed -i 's/__buildVersion__/${TAG_NAME#v}/g' addon/manifest.json
+          sed -i "s/__buildVersion__/${TAG_NAME#v}/g" addon/manifest.json
           sed -i 's/__description__/AI-powered PDF reader for Zotero/g' addon/manifest.json
           sed -i 's/__homepage__/https:\/\/github.com\/Callioper\/zotero-aireader/g' addon/manifest.json
           sed -i 's/__author__/Callioper/g' addon/manifest.json
           sed -i 's/__addonID__/zotero-ai-reader@callioper/g' addon/manifest.json
-          echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
 
       - name: Copy addon files
         run: |
