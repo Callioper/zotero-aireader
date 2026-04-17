@@ -26,7 +26,7 @@ jobs:
         run: mkdir -p .scaffold/build/addon/content/scripts
 
       - name: Build TypeScript with esbuild
-        run: npx --yes esbuild@0.21.0 src/index.ts --bundle --target=firefox115 --outfile=.scaffold/build/addon/content/scripts/zoteroAIRreader.js --define:__env='"production"'
+        run: ./node_modules/.bin/esbuild src/index.ts --bundle --target=firefox115 --outfile=.scaffold/build/addon/content/scripts/zoteroAIRreader.js --define:__env='"production"'
 
       - name: Process manifest.json
         run: |
