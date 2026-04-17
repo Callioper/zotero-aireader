@@ -1,66 +1,51 @@
 import { apiClient, ChatResponse } from "./api-client";
 
 export class AIChatPanel {
-  private panel: Element;
+  private panel: Element | null = null;
   private itemId: number | null = null;
   private pdfPath: string | null = null;
 
-  constructor() {
-    this.panel = this.createPanel();
-  }
+  private createPanel(): Element {
+    const vbox = document.createElement("vbox");
+    vbox.setAttribute("flex", "1");
 
-  private createPanel() {
-    return ztoolkit.createElement(document, "vbox", {
-      namespace: "xul",
-      attributes: { flex: "1" },
-      children: [
-        {
-          tag: "label",
-          attributes: { value: "AI 问答", style: "font-weight: bold; font-size: 16px;" },
-        },
-        {
-          tag: "vbox",
-          attributes: { flex: "1", style: "overflow: auto;" },
-          children: [],
-          id: "chat-messages",
-        },
-        {
-          tag: "hbox",
-          attributes: { align: "center" },
-          children: [
-            {
-              tag: "textbox",
-              attributes: { flex: "1", placeholder: "输入您的问题..." },
-              id: "chat-input",
-              listeners: [
-                {
-                  type: "keypress",
-                  listener: (e: KeyboardEvent) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      this.sendQuestion();
-                    }
-                  },
-                },
-              ],
-            },
-            {
-              tag: "button",
-              attributes: { label: "发送" },
-              listeners: [
-                {
-                  type: "click",
-                  listener: () => this.sendQuestion(),
-                },
-              ],
-            },
-          ],
-        },
-      ],
+    const title = document.createElement("label");
+    title.setAttribute("value", "AI 问答");
+    title.setAttribute("style", "font-weight: bold; font-size: 16px;");
+    vbox.appendChild(title);
+
+    const messages = document.createElement("vbox");
+    messages.setAttribute("flex", "1");
+    messages.setAttribute("style", "overflow: auto;");
+    messages.setAttribute("id", "chat-messages");
+    vbox.appendChild(messages);
+
+    const inputBox = document.createElement("hbox");
+    inputBox.setAttribute("align", "center");
+
+    const input = document.createElement("textbox");
+    input.setAttribute("flex", "1");
+    input.setAttribute("placeholder", "输入您的问题...");
+    input.setAttribute("id", "chat-input");
+    input.addEventListener("keypress", (e: KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        this.sendQuestion();
+      }
     });
+    inputBox.appendChild(input);
+
+    const button = document.createElement("button");
+    button.setAttribute("label", "发送");
+    button.addEventListener("click", () => this.sendQuestion());
+    inputBox.appendChild(button);
+
+    vbox.appendChild(inputBox);
+
+    return vbox;
   }
 
-  async open(itemId: number, pdfPath: string) {
+  open(itemId: number, pdfPath: string) {
     this.itemId = itemId;
     this.pdfPath = pdfPath;
 
@@ -74,10 +59,13 @@ export class AIChatPanel {
       messagesContainer.innerHTML = "";
     }
 
-    this.panel.id = "zotero-air-chat-panel";
-    ztoolkit.append(document.body, this.panel);
+    if (!this.panel) {
+      this.panel = this.createPanel();
+    }
+    this.panel.setAttribute("id", "zotero-air-chat-panel");
+    document.body.appendChild(this.panel);
 
-    await this.indexDocument();
+    this.indexDocument();
   }
 
   private setInputEnabled(enabled: boolean) {
@@ -140,38 +128,26 @@ export class AIChatPanel {
     const messagesContainer = document.getElementById("chat-messages");
     if (!messagesContainer) return;
 
-    const answerBox = ztoolkit.createElement(document, "vbox", {
-      attributes: { style: "margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 5px;" },
-    });
+    const answerBox = document.createElement("vbox");
+    answerBox.setAttribute("style", "margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 5px;");
 
-    answerBox.appendChild(
-      ztoolkit.createElement(document, "label", {
-        attributes: {
-          value: `AI 回答: ${response.answer}`,
-          style: "color: #333;",
-        },
-      })
-    );
+    const answerLabel = document.createElement("label");
+    answerLabel.setAttribute("value", `AI 回答: ${response.answer}`);
+    answerLabel.setAttribute("style", "color: #333;");
+    answerBox.appendChild(answerLabel);
 
     if (response.citations.length > 0) {
-      const citationsLabel = ztoolkit.createElement(document, "label", {
-        attributes: {
-          value: "参考来源:",
-          style: "font-weight: bold; margin-top: 5px;",
-        },
-      });
+      const citationsLabel = document.createElement("label");
+      citationsLabel.setAttribute("value", "参考来源:");
+      citationsLabel.setAttribute("style", "font-weight: bold; margin-top: 5px;");
       answerBox.appendChild(citationsLabel);
 
       response.citations.forEach((c) => {
         const citationText = `【${c.index}】${c.chapter_title}: ${c.quoted_text}`;
-        answerBox.appendChild(
-          ztoolkit.createElement(document, "label", {
-            attributes: {
-              value: citationText,
-              style: "font-size: 12px; color: #666; margin-left: 10px;",
-            },
-          })
-        );
+        const citationLabel = document.createElement("label");
+        citationLabel.setAttribute("value", citationText);
+        citationLabel.setAttribute("style", "font-size: 12px; color: #666; margin-left: 10px;");
+        answerBox.appendChild(citationLabel);
       });
     }
 
@@ -189,12 +165,9 @@ export class AIChatPanel {
       success: "#388e3c",
     };
 
-    const msgLabel = ztoolkit.createElement(document, "label", {
-      attributes: {
-        value: text,
-        style: `color: ${colors[type] || colors.info}; margin: 5px 0;`,
-      },
-    });
+    const msgLabel = document.createElement("label");
+    msgLabel.setAttribute("value", text);
+    msgLabel.setAttribute("style", `color: ${colors[type] || colors.info}; margin: 5px 0;`);
 
     messagesContainer.appendChild(msgLabel);
   }
