@@ -41,13 +41,21 @@ export class APIClient {
     this.baseUrl = baseUrl;
   }
 
+  private async handleResponse<T>(response: Response): Promise<T> {
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`API error ${response.status}: ${error || response.statusText}`);
+    }
+    return response.json();
+  }
+
   async indexItem(itemId: number, pdfPath: string): Promise<IndexResponse> {
     const response = await fetch(`${this.baseUrl}/index`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ item_id: itemId, pdf_path: pdfPath }),
     });
-    return response.json();
+    return this.handleResponse(response);
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
@@ -56,7 +64,7 @@ export class APIClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
     });
-    return response.json();
+    return this.handleResponse(response);
   }
 
   async search(q: string, itemId?: number, limit?: number): Promise<{ results: SearchResult[] }> {
@@ -65,12 +73,12 @@ export class APIClient {
     if (limit !== undefined) params.append("limit", String(limit));
 
     const response = await fetch(`${this.baseUrl}/search?${params}`);
-    return response.json();
+    return this.handleResponse(response);
   }
 
   async health(): Promise<{ status: string }> {
-    const response = await fetch(`${this.baseUrl}/../health`);
-    return response.json();
+    const response = await fetch(`${this.baseUrl.replace('/api', '')}/health`);
+    return this.handleResponse(response);
   }
 }
 
