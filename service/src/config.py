@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     lmstudio_base_url: str = "http://localhost:1234"
     lmstudio_api_key: str = "lm-studio"
     deepseek_api_key: str = ""
+    deepseek_base_url: str = "https://api.deepseek.com"
     openai_api_key: str = ""
     anthropic_api_key: str = ""
 

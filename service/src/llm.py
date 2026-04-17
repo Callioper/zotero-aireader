@@ -11,6 +11,25 @@ class LLMManager:
     def __init__(self):
         self._llms = {}
 
+    def _convert_messages(
+        self, messages: list[dict], system_prompt: str | None = None
+    ) -> list:
+        langchain_messages = []
+        if system_prompt:
+            langchain_messages.append(SystemMessage(content=system_prompt))
+
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "system":
+                langchain_messages.append(SystemMessage(content=content))
+            elif role == "user":
+                langchain_messages.append(HumanMessage(content=content))
+            elif role == "assistant":
+                langchain_messages.append(AIMessage(content=content))
+
+        return langchain_messages
+
     def get_llm(self, provider: str | None = None, model: str | None = None):
         provider = provider or settings.default_llm_provider
         model = model or settings.default_llm_model
@@ -30,7 +49,7 @@ class LLMManager:
                 )
             elif provider == "deepseek":
                 self._llms[key] = ChatOpenAI(
-                    base_url="https://api.deepseek.com",
+                    base_url=settings.deepseek_base_url,
                     api_key=settings.deepseek_api_key,
                     model=model,
                 )
@@ -58,23 +77,13 @@ class LLMManager:
         system_prompt: str | None = None,
     ) -> str:
         llm = self.get_llm(provider, model)
+        langchain_messages = self._convert_messages(messages, system_prompt)
 
-        langchain_messages = []
-        if system_prompt:
-            langchain_messages.append(SystemMessage(content=system_prompt))
-
-        for msg in messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            if role == "system":
-                langchain_messages.append(SystemMessage(content=content))
-            elif role == "user":
-                langchain_messages.append(HumanMessage(content=content))
-            elif role == "assistant":
-                langchain_messages.append(AIMessage(content=content))
-
-        response = await llm.ainvoke(langchain_messages)
-        return response.content
+        try:
+            response = await llm.ainvoke(langchain_messages)
+            return response.content
+        except Exception as e:
+            raise RuntimeError(f"LLM chat failed: {e}") from e
 
     async def stream_chat(
         self,
@@ -84,24 +93,14 @@ class LLMManager:
         system_prompt: str | None = None,
     ) -> AsyncGenerator[str, None]:
         llm = self.get_llm(provider, model)
+        langchain_messages = self._convert_messages(messages, system_prompt)
 
-        langchain_messages = []
-        if system_prompt:
-            langchain_messages.append(SystemMessage(content=system_prompt))
-
-        for msg in messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            if role == "system":
-                langchain_messages.append(SystemMessage(content=content))
-            elif role == "user":
-                langchain_messages.append(HumanMessage(content=content))
-            elif role == "assistant":
-                langchain_messages.append(AIMessage(content=content))
-
-        async for chunk in llm.astream(langchain_messages):
-            if hasattr(chunk, "content") and chunk.content:
-                yield chunk.content
+        try:
+            async for chunk in llm.astream(langchain_messages):
+                if hasattr(chunk, "content") and chunk.content:
+                    yield chunk.content
+        except Exception as e:
+            raise RuntimeError(f"LLM stream_chat failed: {e}") from e
 
 
 llm_manager = LLMManager()
