@@ -9,12 +9,10 @@ const hooks = {
     this.registerNotifier();
     this.registerPrefs();
     this.registerMenu();
-    this.data.initialized = true;
   },
 
   onShutdown() {
     ztoolkit.log("startup-finish");
-    this.data.initialized = false;
     aiChatPanel.close();
   },
 
@@ -24,14 +22,6 @@ const hooks = {
 
   onMainWindowUnload(window: Window) {
     ztoolkit.unregisterAll();
-  },
-
-  onPrefsEvent(event: string, data: { window: Window }) {
-    switch (event) {
-      case "load":
-        this.initPrefsPanel(data.window);
-        break;
-    }
   },
 
   registerNotifier() {
@@ -90,10 +80,6 @@ const hooks = {
     });
   },
 
-  initPrefsPanel(window: Window) {
-    // Initialize preferences panel
-  },
-
   async onAIChat() {
     const items = ZoteroPane.getSelectedItems();
     if (!items.length) {
@@ -102,13 +88,14 @@ const hooks = {
     }
 
     const item = items[0];
-    const attachment = item.getAttachment?.();
-    if (!attachment) {
+    const attachments = item.attachments;
+    if (!attachments || attachments.length === 0) {
       ztoolkit.alert("请选择一个包含 PDF 附件的文献条目");
       return;
     }
 
-    const pdfPath = await attachment.getFilePath?.();
+    const attachment = attachments[0];
+    const pdfPath = attachment.filePath;
     if (!pdfPath) {
       ztoolkit.alert("无法获取 PDF 文件路径");
       return;
@@ -125,13 +112,14 @@ const hooks = {
     }
 
     const item = items[0];
-    const attachment = item.getAttachment?.();
-    if (!attachment) {
+    const attachments = item.attachments;
+    if (!attachments || attachments.length === 0) {
       ztoolkit.alert("请选择一个包含 PDF 附件的文献条目");
       return;
     }
 
-    const pdfPath = await attachment.getFilePath?.();
+    const attachment = attachments[0];
+    const pdfPath = attachment.filePath;
     if (!pdfPath) {
       ztoolkit.alert("无法获取 PDF 文件路径");
       return;
