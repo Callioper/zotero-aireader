@@ -56,10 +56,8 @@ jobs:
 
       - name: Create xpi archive
         run: |
-          cd .scaffold/build/addon
-          zip -r ../../zotero-ai-reader.xpi .
-          cd ../..
-          ls -la .scaffold/build/
+          ls -la .scaffold/build/addon/
+          cd .scaffold/build/addon && zip -r ../../zotero-ai-reader.xpi . && ls -la ../../
 
       - name: Verify xpi exists
         run: ls -la .scaffold/build/zotero-ai-reader.xpi
