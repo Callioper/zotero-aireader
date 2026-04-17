@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "description": "AI-powered PDF reader for Zotero",
+  "author": {
+    "name": "Callioper",
+    "email": "callioper@example.com"
+  },
+  "license": "AGPL-3.0",
+  "config": {
+    "addonName": "Zotero AI Reader",
+    "addonID": "zotero-ai-reader@callioper",
+    "addonRef": "zoteroAIRreader",
+    "addonInstance": "ZoteroAIRreader",
+    "prefsPrefix": "extensions.zotero-zoteroAIRreader"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Callioper/zotero-aireader.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Callioper/zotero-aireader/issues"
+  },
+  "homepage": "https://github.com/Callioper/zotero-aireader#readme",
+  "scripts": {
+    "start": "npx zotero-plugin serve",
+    "build": "npx zotero-plugin build",
+    "release": "npx zotero-plugin release"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "esbuild": "^0.21.0",
+    "typescript": "^5.9.3",
+    "zotero-plugin": "latest",
+    "zotero-plugin-toolkit": "latest",
+    "zotero-types": "latest"
+  }
+}

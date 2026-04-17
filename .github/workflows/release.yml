@@ -1,0 +1,158 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - v**
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build plugin
+        run: |
+          mkdir -p .scaffold/build/addon/content/scripts
+          ./node_modules/.bin/esbuild src/index.ts \
+            --bundle \
+            --format=iife \
+            --target=firefox115 \
+            --outfile=.scaffold/build/addon/content/scripts/zoteroAIRreader.js \
+            --define:__env='"production"' \
+            --global-name=_globalThis
+
+      - name: Process manifest.json
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          sed -i 's/__addonName__/Zotero AI Reader/g' addon/manifest.json
+          sed -i "s/__buildVersion__/${TAG_NAME#v}/g" addon/manifest.json
+          sed -i 's/__description__/AI-powered PDF reader for Zotero/g' addon/manifest.json
+          sed -i 's/__homepage__/https:\/\/github.com\/Callioper\/zotero-aireader/g' addon/manifest.json
+          sed -i 's/__author__/Callioper/g' addon/manifest.json
+          sed -i 's/__addonID__/zotero-ai-reader@callioper/g' addon/manifest.json
+          sed -i 's/__updateURL__/https:\/\/raw.githubusercontent.com\/Callioper\/zotero-aireader\/main\/update.json/g' addon/manifest.json
+
+      - name: Copy and process addon files
+        run: |
+          cp addon/manifest.json .scaffold/build/addon/
+          cp -r addon/content .scaffold/build/addon/
+          cp -r addon/locale .scaffold/build/addon/
+          cp addon/bootstrap.js .scaffold/build/addon/
+          cp addon/prefs.js .scaffold/build/addon/
+          find .scaffold/build/addon -name "*.xhtml" -exec sed -i 's/__addonRef__/zoteroAIRreader/g' {} \;
+          find .scaffold/build/addon -name "*.js" -exec sed -i 's/__addonRef__/zoteroAIRreader/g' {} \;
+          find .scaffold/build/addon -name "*.js" -exec sed -i 's/__addonInstance__/ZoteroAIRreader/g' {} \;
+
+      - name: Show build output
+        run: ls -la .scaffold/build/addon/content/scripts/
+
+      - name: Create xpi archive
+        run: |
+          ls -la .scaffold/build/addon/
+          cd .scaffold/build/addon
+          zip -r ../zotero-ai-reader.xpi .
+          ls -la ..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-build
+          path: .scaffold/build/zotero-ai-reader.xpi
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            update.json
+          sparse-checkout-cone-mode: false
+
+      - name: Download plugin artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: plugin-build
+          path: .
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "*.xpi"
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update update.json
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: Callioper
+          REPO: zotero-aireader
+        run: |
+          VERSION=${TAG_NAME#v}
+          HASH=$(sha256sum zotero-ai-reader.xpi | cut -d' ' -f1)
+
+          # Download existing update.json or create new one
+          curl -sL "https://raw.githubusercontent.com/$OWNER/$REPO/main/update.json" -o update.json 2>/dev/null
+          if [ ! -s update.json ]; then
+            echo '{"addons":{"zotero-ai-reader@callioper":{"updates":[]}}}' > update.json
+          fi
+
+          # Update using node
+          node -e "
+          const fs = require('fs');
+          const version = '$VERSION';
+          const tagName = '$TAG_NAME';
+          const owner = '$OWNER';
+          const repo = '$REPO';
+          const hash = '$HASH';
+
+          let update;
+          try {
+            const content = fs.readFileSync('update.json', 'utf8');
+            update = JSON.parse(content);
+          } catch (e) {
+            update = {'addons':{'zotero-ai-reader@callioper':{'updates':[]}}};
+          }
+
+          const newVersion = {
+            'version': version,
+            'update_link': 'https://github.com/' + owner + '/' + repo + '/releases/download/' + tagName + '/zotero-ai-reader.xpi',
+            'update_hash': 'sha256:' + hash,
+            'applications': {
+              'zotero': {
+                'strict_min_version': '6.999',
+                'strict_max_version': '9.*'
+              }
+            }
+          };
+
+          update.addons['zotero-ai-reader@callioper'].updates = update.addons['zotero-ai-reader@callioper'].updates.filter(u => u.version !== version);
+          update.addons['zotero-ai-reader@callioper'].updates.unshift(newVersion);
+          fs.writeFileSync('update.json', JSON.stringify(update, null, 2));
+          console.log('Updated update.json');
+          "
+
+      - name: Push update.json
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git checkout -b update-branch
+          git add update.json
+          git commit -m "chore: update update.json for ${{ github.ref_name }}"
+          git push origin update-branch:main

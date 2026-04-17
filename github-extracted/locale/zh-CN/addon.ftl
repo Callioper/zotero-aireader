@@ -1,0 +1,16 @@
+startup-begin = 插件加载中
+startup-finish = 插件已就绪
+menuitem-label = 模板：辅助示例
+menupopup-label = 模板：弹出菜单
+menuitem-submenulabel = 模板
+menuitem-filemenulabel = 模板：文件菜单项
+prefs-title = AI 阅读器设置
+prefs-table-title = 标题
+prefs-table-detail = 详情
+tabpanel-lib-tab-label = 文献库标签页
+tabpanel-reader-tab-label = 阅读器标签页
+pref-title = AI 阅读器设置
+pref-enable = 启用 AI 阅读器
+pref-input = 输入
+pref-api-url = API 地址
+pref-help = { name } v{ version } ({ time })
