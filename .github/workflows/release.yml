@@ -17,15 +17,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci
+          node-version: '22'
 
       - name: Build plugin
-        run: npm run build
-        env:
-          NODE_ENV: production
+        run: npx zotero-plugin build
+
+      - name: Show build output
+        run: ls -la .scaffold/build/ || echo "No build directory"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
