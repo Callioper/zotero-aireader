@@ -42,7 +42,7 @@ jobs:
           sed -i 's/__homepage__/https:\/\/github.com\/Callioper\/zotero-aireader/g' addon/manifest.json
           sed -i 's/__author__/Callioper/g' addon/manifest.json
           sed -i 's/__addonID__/zotero-ai-reader@callioper/g' addon/manifest.json
-          sed -i 's/__updateURL__/https:\/\/github.com\/Callioper\/zotero-aireader\/releases\/download\/release\/update.json/g' addon/manifest.json
+          sed -i 's/__updateURL__/https:\/\/github.com\/Callioper\/zotero-aireader\/releases\/latest\/download\/update.json/g' addon/manifest.json
 
       - name: Copy and process addon files
         run: |
@@ -69,23 +69,6 @@ jobs:
           name: plugin-build
           path: .scaffold/build/zotero-ai-reader.xpi
 
-      - name: Create update.json
-        env:
-          TAG_NAME: ${{ github.ref_name }}
-        run: |
-          VERSION=${TAG_NAME#v}
-          OWNER=Callioper
-          REPO=zotero-aireader
-          HASH=$(sha256sum .scaffold/build/zotero-ai-reader.xpi | cut -d' ' -f1)
-          printf '{"addons":{"zotero-ai-reader@callioper":{"updates":[{"version":"%s","update_link":"https://github.com/%s/%s/releases/download/%s/zotero-ai-reader.xpi","update_hash":"sha256:%s","applications":{"zotero":{"strict_min_version":"6.999","strict_max_version":"9.*"}}}]}}}' "$VERSION" "$OWNER" "$REPO" "$TAG_NAME" "$HASH" > update.json
-          cat update.json
-
-      - name: Upload update.json
-        uses: actions/upload-artifact@v4
-        with:
-          name: update-json
-          path: update.json
-
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -96,18 +79,51 @@ jobs:
           name: plugin-build
           path: .
 
-      - name: Download update.json artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: update-json
-          path: .
-
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            *.xpi
-            update.json
+          files: "*.xpi"
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update update.json
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${TAG_NAME#v}
+          OWNER=Callioper
+          REPO=zotero-aireader
+          HASH=$(sha256sum zotero-ai-reader.xpi | cut -d' ' -f1)
+
+          # Download existing update.json if it exists
+          curl -sL "https://raw.githubusercontent.com/$OWNER/$REPO/main/update.json" -o update.json 2>/dev/null || echo '{"addons":{"zotero-ai-reader@callioper":{"updates":[]}}}' > update.json
+
+          # Add new version to updates array
+          node -e "
+            const fs = require('fs');
+            let update = JSON.parse(fs.readFileSync('update.json', 'utf8'));
+            const newVersion = {
+              version: '$VERSION',
+              update_link: 'https://github.com/$OWNER/$REPO/releases/download/$TAG_NAME/zotero-ai-reader.xpi',
+              update_hash: 'sha256:$HASH',
+              applications: {
+                zotero: {
+                  strict_min_version: '6.999',
+                  strict_max_version: '9.*'
+                }
+              }
+            };
+            // Remove old version if exists and add new one at beginning
+            update.addons['zotero-ai-reader@callioper'].updates = update.addons['zotero-ai-reader@callioper'].updates.filter(u => u.version !== '$VERSION');
+            update.addons['zotero-ai-reader@callioper'].updates.unshift(newVersion);
+            fs.writeFileSync('update.json', JSON.stringify(update, null, 2));
+          "
+
+      - name: Commit update.json
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          file_pattern: update.json
+          commit_message: "chore: update update.json for ${{ github.ref_name }}"
+          branch: main
