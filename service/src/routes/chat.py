@@ -11,6 +11,28 @@ _item_store = {}
 _item_lock = threading.Lock()
 
 
+class ChatRequest(BaseModel):
+    item_id: int
+    question: str
+    use_rag: bool = True
+    provider: str | None = None
+    model: str | None = None
+
+
+class Citation(BaseModel):
+    index: int
+    chapter_title: str
+    chapter_index: int
+    page_num: int | None
+    quoted_text: str
+    reasoning: str
+
+
+class ChatResponse(BaseModel):
+    answer: str
+    citations: list[Citation]
+
+
 def set_item_store(item_id: int, data: dict):
     with _item_lock:
         _item_store[item_id] = data
@@ -47,8 +69,9 @@ async def chat(req: ChatRequest):
         context = ""
         citations = []
 
+    ref_material = f"Reference Material:\n{context}" if context else ""
     system_prompt = f"""You are an AI reading assistant. Answer user questions based on the reference material.
-{f"Reference Material:\n{context}" if context else ""}
+{ref_material}
 
 Answer Requirements:
 1. Answer based on reference material, use 【N】 to indicate sources

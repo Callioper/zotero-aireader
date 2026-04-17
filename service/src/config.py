@@ -27,4 +27,4 @@ class Settings(BaseSettings):
     db_path: Path = Path("data.db")
 
 
-
+settings = Settings()
