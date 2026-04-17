@@ -23,6 +23,10 @@ class SemanticChunker:
     def chunk_documents(self, documents: list[Document]) -> list[Document]:
         chunked = []
         for doc in documents:
+            if not doc.page_content or not doc.page_content.strip():
+                import logging
+                logging.warning(f"Skipping document with empty content: source={doc.metadata.get('source', 'unknown')}")
+                continue
             chunks = self.splitter.split_documents([doc])
             for i, chunk in enumerate(chunks):
                 chunk.metadata["chunk_index"] = i

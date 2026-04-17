@@ -9,7 +9,13 @@ class PDFProcessor:
         self.doc = None
 
     def extract_metadata(self) -> dict:
-        self.doc = pymupdf.open(str(self.pdf_path))
+        if self.doc is None:
+            if not self.pdf_path.exists():
+                raise FileNotFoundError(f"PDF file not found: {self.pdf_path}")
+            try:
+                self.doc = pymupdf.open(str(self.pdf_path))
+            except Exception as e:
+                raise RuntimeError(f"Failed to open PDF: {self.pdf_path}") from e
         return {
             "title": self.doc.metadata.get("title", ""),
             "author": self.doc.metadata.get("author", ""),
@@ -70,24 +76,23 @@ class PDFProcessor:
 
 
 def extract_pdf(pdf_path: str | Path) -> tuple[list[Document], dict]:
-    processor = PDFProcessor(pdf_path)
-    metadata = processor.extract_metadata()
-    chapters = processor.extract_chapters()
+    with PDFProcessor(pdf_path) as processor:
+        metadata = processor.extract_metadata()
+        chapters = processor.extract_chapters()
 
-    documents = []
-    for i, chapter in enumerate(chapters):
-        doc = Document(
-            page_content=chapter.get("text", ""),
-            metadata={
-                "chapter_index": i,
-                "chapter_title": chapter.get("title", f"Chapter {i+1}"),
-                "chapter_level": chapter.get("level", 1),
-                "start_page": chapter.get("start_page", 0),
-                "end_page": chapter.get("end_page", 0),
-                "source": str(pdf_path),
-            }
-        )
-        documents.append(doc)
+        documents = []
+        for i, chapter in enumerate(chapters):
+            doc = Document(
+                page_content=chapter.get("text", ""),
+                metadata={
+                    "chapter_index": i,
+                    "chapter_title": chapter.get("title", f"Chapter {i+1}"),
+                    "chapter_level": chapter.get("level", 1),
+                    "start_page": chapter.get("start_page", 0),
+                    "end_page": chapter.get("end_page", 0),
+                    "source": str(pdf_path),
+                }
+            )
+            documents.append(doc)
 
-    processor.close()
-    return documents, metadata
+        return documents, metadata
