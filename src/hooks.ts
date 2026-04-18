@@ -114,19 +114,15 @@ function registerMenu() {
     target: "main/library/item",
     menus: [
       {
-        menuType: "menuitem",
-        label: "AI Chat",
-        onCommand: () => onAIChat(),
+        menuType: "separator",
       },
       {
         menuType: "menuitem",
-        label: "Summarize",
-        onCommand: () => onSummarize(),
+        label: "Test Item",
+        onCommand: () => Zotero.debug("Test clicked"),
       },
       {
-        menuType: "menuitem",
-        label: "Semantic Search",
-        onCommand: () => onSearch(),
+        menuType: "separator",
       },
     ],
   });
