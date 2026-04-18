@@ -17,7 +17,7 @@ export default defineConfig({
     assets: ["addon/**/*.*"],
     define: {
       ...pkg.config,
-      author: pkg.author,
+      author: (pkg.author as any)?.name || String(pkg.author),
       description: pkg.description,
       homepage: pkg.homepage,
       buildVersion: pkg.version,

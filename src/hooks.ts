@@ -1,8 +1,13 @@
 import { config } from "../package.json";
-import { apiClient } from "./modules/api-client";
-import { aiChatPanel } from "./modules/ai-chat";
+import { aiPanel } from "./modules/ai-panel";
+import { isEnabled } from "./utils/prefs";
 
 declare const rootURI: string;
+
+// Track registered resources for cleanup
+let registeredSectionID: string | false = false;
+let registeredPrefsPaneID: string | false = false;
+let readerListenersRegistered = false;
 
 async function onStartup() {
   await Zotero.initializationPromise;
@@ -15,24 +20,51 @@ async function onStartup() {
   const l10n = new Localization([`${config.addonRef}-addon.ftl`], true);
   Zotero[config.addonInstance].data.locale = { current: l10n };
 
+  // CRITICAL: Add FTL resources to main window BEFORE registering menus
+  // Otherwise menu l10nID won't resolve and labels will be empty
+  const mainWindow = Zotero.getMainWindow();
+  if (mainWindow && mainWindow.document.l10n) {
+    mainWindow.document.l10n.addResourceIds([`${config.addonRef}-addon.ftl`]);
+    Zotero.debug("AI Reader: FTL resources added to main window");
+  }
+
   registerNotifier();
   registerPrefs();
-  registerStyle();
   registerMenu();
+  registerReaderListeners();
+
+  // Register the AI panel in the right-side item pane
+  registeredSectionID = aiPanel.register();
 
   Zotero[config.addonInstance].data.initialized = true;
+  Zotero.debug("AI Reader: startup complete");
 }
 
 function onShutdown() {
   Zotero.debug("AI Reader: onShutdown called");
-  aiChatPanel.close();
+
+  // Unregister the AI panel section
+  aiPanel.unregister();
+
+  // Unregister reader event listeners
+  unregisterReaderListeners();
+
+  // Unregister preference pane (also auto-unregistered by Zotero, but be explicit)
+  if (registeredPrefsPaneID) {
+    try {
+      Zotero.PreferencePanes.unregister(registeredPrefsPaneID);
+    } catch (e) {
+      Zotero.debug("AI Reader: error unregistering prefs pane: " + e);
+    }
+    registeredPrefsPaneID = false;
+  }
+
   // @ts-ignore - Plugin instance is not typed
   delete Zotero[config.addonInstance];
 }
 
 async function onMainWindowLoad(win: Window): Promise<void> {
-  Zotero.debug("AI Reader: onMainWindowLoad called, window type:", typeof win);
-  Zotero.debug("AIReader: win.document element:", win.document ? "exists" : "null");
+  Zotero.debug("AI Reader: onMainWindowLoad called");
 
   await new Promise((resolve) => {
     if (win.document.readyState !== "complete") {
@@ -51,23 +83,26 @@ async function onMainWindowLoad(win: Window): Promise<void> {
   // Load localization
   win.document.l10n?.addResourceIds([`${config.addonRef}-addon.ftl`]);
 
-  injectStyle(win);
+  // Inject CSS for the AI panel
+  injectCSS(win);
 }
 
-function injectStyle(win: Window) {
-  const style = `
-    #zotero-air-reader-menu {
-      font-weight: bold;
-    }
-  `;
-  const styleElement = win.document.createElement("style");
-  styleElement.textContent = style;
-  win.document.documentElement.appendChild(styleElement);
+function injectCSS(win: Window) {
+  const link = win.document.createElement("link");
+  link.id = "zotero-ai-reader-css";
+  link.rel = "stylesheet";
+  link.href = `chrome://zoteroAIRreader/content/ai-panel.css`;
+  win.document.documentElement.appendChild(link);
 }
 
 function onMainWindowUnload(win: Window): void {
   Zotero.debug("AI Reader: onMainWindowUnload called");
+  // Remove injected CSS
+  const css = win.document.getElementById("zotero-ai-reader-css");
+  if (css) css.remove();
 }
+
+// ─── Notifier ────────────────────────────────────────────────
 
 function registerNotifier() {
   Zotero.Notifier.registerObserver(
@@ -78,7 +113,7 @@ function registerNotifier() {
         ids: Array<string | number>,
         extraData: { [key: string]: any },
       ) => {
-        Zotero.debug("AI Reader: notified", event, type, ids);
+        Zotero.debug(`AI Reader: notified ${event} ${type}`);
       },
     },
     ["item"],
@@ -86,160 +121,207 @@ function registerNotifier() {
   );
 }
 
+// ─── Preferences ─────────────────────────────────────────────
+
 function registerPrefs() {
+  if (registeredPrefsPaneID) {
+    Zotero.debug("AI Reader: prefs pane already registered, skipping");
+    return;
+  }
   Zotero.debug("AI Reader: registerPrefs called");
   try {
-    Zotero.PrefsPane.register({
-      plugin: {
-        addonID: config.addonID,
-        rootURI: rootURI,
-        onPrefsEvent: onPrefsEvent,
-      },
+    // Zotero 8+/9: Zotero.PreferencePanes.register() (NOT Zotero.PrefsPane)
+    registeredPrefsPaneID = Zotero.PreferencePanes.register({
+      pluginID: config.addonID,
       src: rootURI + "content/preferences.xhtml",
+      id: "zotero-ai-reader-prefs",
+      label: "AI Reader",
+      image: rootURI + "content/icons/icon20.svg",
     });
-    Zotero.debug("AI Reader: PrefsPane registered");
+    Zotero.debug("AI Reader: PreferencePanes registered, id=" + registeredPrefsPaneID);
   } catch (e) {
     Zotero.debug("AI Reader ERROR in registerPrefs: " + e);
   }
 }
 
-function registerStyle() {
-  // Style registration handled per-window in onMainWindowLoad
+function onPrefsEvent(event: string, data: { window: Window }) {
+  Zotero.debug("AI Reader: onPrefsEvent called " + event);
 }
 
-function onPrefsEvent(event: string, data: { window: Window }) {
-  Zotero.debug("AI Reader: onPrefsEvent called", event);
-  if (event === "load") {
-    Zotero.debug("AI Reader: prefs pane loaded");
-  }
-}
+// ─── Menu ────────────────────────────────────────────────────
 
 function registerMenu() {
   Zotero.debug("AI Reader: registerMenu called");
 
-  // Single menu item test
-  Zotero.MenuManager.registerMenu({
-    menuID: "air-reader-item",
-    pluginID: config.addonID,
-    target: "main/library/item",
-    menus: [
-      {
-        menuType: "menuitem",
-        label: "Test",
-        onCommand: () => Zotero.debug("Test clicked"),
-      },
-    ],
-  });
-  Zotero.debug("AI Reader: menu registered");
+  // Zotero 9 MenuManager.registerMenu() top-level options are:
+  //   { menuID, pluginID, target, menus }
+  // Top-level DOES NOT take menuType/l10nID/icon. Those live on each item in `menus`.
+  // Valid menuType values inside menus: "menuitem" | "separator" | "submenu" (NOT "menu")
+  try {
+    Zotero.MenuManager.registerMenu({
+      menuID: "air-reader-menu",
+      pluginID: config.addonID,
+      target: "main/library/item",
+      menus: [
+        {
+          menuType: "submenu",
+          l10nID: `${config.addonRef}-zotero-air-reader-menu-label`,
+          icon: rootURI + "content/icons/icon16.svg",
+          menus: [
+            {
+              menuType: "menuitem",
+              l10nID: `${config.addonRef}-zotero-air-reader-menu-ai-chat`,
+              onCommand: () => onAIChat(),
+            },
+            {
+              menuType: "menuitem",
+              l10nID: `${config.addonRef}-zotero-air-reader-menu-summarize`,
+              onCommand: () => onSummarize(),
+            },
+            {
+              menuType: "menuitem",
+              l10nID: `${config.addonRef}-zotero-air-reader-menu-search`,
+              onCommand: () => onSearch(),
+            },
+          ],
+        },
+      ],
+    });
+    Zotero.debug("AI Reader: menu registered");
+  } catch (e) {
+    Zotero.debug("AI Reader ERROR in registerMenu: " + e);
+  }
 }
 
-function alert(win: Window, title: string, msg: string) {
-  const prom = new win.XULDialog({
-    buttons: [{ label: "OK", focus: true }],
-    title: title,
-    message: msg,
+// ─── Reader Event Listeners ──────────────────────────────────
+
+function textSelectionHandler(event: any) {
+  const { reader, doc, params, append } = event;
+  const selectedText = params?.annotation?.text || "";
+  if (!selectedText) return;
+
+  const container = doc.createElement("div");
+  container.style.cssText = "padding: 4px 8px; cursor: pointer; color: #0078d7; font-size: 12px;";
+  container.textContent = "\u{1F916} AI 分析选中文本";
+  container.addEventListener("click", () => {
+    Zotero.debug(`AI Reader: text selected for analysis: ${selectedText.substring(0, 50)}...`);
+    aiPanel.setSelectedText(selectedText);
   });
-  prom.show();
+  append(container);
 }
 
-function getMainWindow(): Window {
-  return Zotero.getMainWindow();
+function toolbarHandler(event: any) {
+  const { reader, doc, append } = event;
+
+  // Create AI button for the reader toolbar
+  const btn = doc.createElement("button");
+  btn.className = "toolbar-button";
+  btn.style.cssText = "display: flex; align-items: center; gap: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px; border: none; background: transparent; color: inherit; border-radius: 4px;";
+  btn.title = "AI Assistant";
+
+  // Icon + label
+  const icon = doc.createElement("span");
+  icon.textContent = "\u{1F916}";
+  icon.style.fontSize = "14px";
+  btn.appendChild(icon);
+
+  const label = doc.createElement("span");
+  label.textContent = "AI";
+  label.style.fontWeight = "500";
+  btn.appendChild(label);
+
+  // Hover effect
+  btn.addEventListener("mouseenter", () => {
+    btn.style.background = "var(--fill-quinary, rgba(0,0,0,0.06))";
+  });
+  btn.addEventListener("mouseleave", () => {
+    btn.style.background = "transparent";
+  });
+
+  // Click: toggle the AI panel section in the side pane
+  btn.addEventListener("click", () => {
+    Zotero.debug("AI Reader: toolbar AI button clicked");
+    // Toggle the right sidebar panel by dispatching a tab select event
+    // The AI panel is registered as a section, so we try to make it visible
+    try {
+      const tabID = Zotero.Reader.getByTabID?.(
+        (Zotero_Tabs as any)?.selectedID
+      );
+      if (tabID) {
+        Zotero.debug("AI Reader: found reader tab, toggling panel");
+      }
+      // Use ZoteroPane to toggle the item pane
+      const itemPane = doc.defaultView?.document?.getElementById("zotero-item-pane");
+      if (itemPane) {
+        // If the item pane is collapsed, expand it
+        if (itemPane.getAttribute("collapsed") === "true") {
+          itemPane.setAttribute("collapsed", "false");
+        }
+      }
+    } catch (e) {
+      Zotero.debug("AI Reader: toolbar toggle error: " + e);
+    }
+  });
+
+  append(btn);
 }
+
+function registerReaderListeners() {
+  if (readerListenersRegistered) {
+    Zotero.debug("AI Reader: reader listeners already registered, skipping");
+    return;
+  }
+
+  Zotero.Reader.registerEventListener(
+    "renderTextSelectionPopup",
+    textSelectionHandler,
+    config.addonID,
+  );
+
+  Zotero.Reader.registerEventListener(
+    "renderToolbar",
+    toolbarHandler,
+    config.addonID,
+  );
+
+  readerListenersRegistered = true;
+  Zotero.debug("AI Reader: reader event listeners registered");
+}
+
+function unregisterReaderListeners() {
+  if (!readerListenersRegistered) return;
+
+  Zotero.Reader.unregisterEventListener(
+    "renderTextSelectionPopup",
+    textSelectionHandler,
+  );
+
+  Zotero.Reader.unregisterEventListener(
+    "renderToolbar",
+    toolbarHandler,
+  );
+
+  readerListenersRegistered = false;
+  Zotero.debug("AI Reader: reader event listeners unregistered");
+}
+
+// ─── Feature Handlers ────────────────────────────────────────
+
+// ─── Feature Handlers (menu commands) ────────────────────────
 
 async function onAIChat() {
-  const win = getMainWindow();
-  const items = ZoteroPane.getSelectedItems();
-  if (!items.length) {
-    alert(win, "提示", "请先选择一个文献条目");
-    return;
-  }
-
-  const item = items[0];
-  const attachments = item.attachments;
-  if (!attachments || attachments.length === 0) {
-    alert(win, "提示", "请选择一个包含 PDF 附件的文献条目");
-    return;
-  }
-
-  const attachment = attachments[0];
-  const pdfPath = attachment.filePath;
-  if (!pdfPath) {
-    alert(win, "提示", "无法获取 PDF 文件路径");
-    return;
-  }
-
-  aiChatPanel.open(item.id, pdfPath);
+  Zotero.debug("AI Reader: AI Chat menu triggered");
+  // The AI panel is already visible in the item pane via registerSection
 }
 
 async function onSummarize() {
-  const win = getMainWindow();
-  const items = ZoteroPane.getSelectedItems();
-  if (!items.length) {
-    alert(win, "提示", "请先选择一个文献条目");
-    return;
-  }
-
-  const item = items[0];
-  const attachments = item.attachments;
-  if (!attachments || attachments.length === 0) {
-    alert(win, "提示", "请选择一个包含 PDF 附件的文献条目");
-    return;
-  }
-
-  const attachment = attachments[0];
-  const pdfPath = attachment.filePath;
-  if (!pdfPath) {
-    alert(win, "提示", "无法获取 PDF 文件路径");
-    return;
-  }
-
-  try {
-    const health = await apiClient.health();
-    if (health.status !== "ok") {
-      alert(win, "提示", "后端服务未运行，请先启动服务");
-      return;
-    }
-
-    alert(win, "提示", "正在生成总结，请稍候...");
-
-    await apiClient.indexItem(item.id, pdfPath);
-    const response = await apiClient.chat({
-      item_id: item.id,
-      question: "请总结这篇文献的主要内容，包括研究问题、方法、结果和结论。",
-      use_rag: true,
-    });
-
-    alert(win, "文献总结", response.answer);
-  } catch (error) {
-    alert(win, "错误", `总结失败: ${error}`);
-  }
+  Zotero.debug("AI Reader: Summarize menu triggered");
+  // TODO: programmatically activate summary skill in the AI panel
 }
 
 async function onSearch() {
-  const win = getMainWindow();
-  const result = win.prompt("语义搜索", "输入搜索内容:");
-  if (!result) return;
-
-  try {
-    const items = ZoteroPane.getSelectedItems();
-    const itemId = items.length > 0 ? items[0].id : undefined;
-
-    const response = await apiClient.search(result, itemId, 10);
-
-    if (response.results.length === 0) {
-      alert(win, "提示", "未找到相关结果");
-      return;
-    }
-
-    let message = `找到 ${response.results.length} 个相关结果:\n\n`;
-    response.results.forEach((r, i) => {
-      message += `【${i + 1}】${r.chapter_title}\n${r.content}\n\n`;
-    });
-
-    alert(win, "搜索结果", message);
-  } catch (error) {
-    alert(win, "错误", `搜索失败: ${error}`);
-  }
+  Zotero.debug("AI Reader: Search menu triggered");
+  // TODO: implement search UI
 }
 
 export default {
@@ -247,5 +329,4 @@ export default {
   onMainWindowLoad,
   onMainWindowUnload,
   onShutdown,
-  onPrefsEvent,
 };

@@ -1,10 +1,10 @@
+import { getApiUrl, getLLMProvider, getModelName } from "../utils/prefs";
+
 const DEFAULT_API_BASE = "http://127.0.0.1:8765/api";
 
 function getApiBase(): string {
   try {
-    const prefKey = "extensions.zotero-zoteroAIRreader.apiUrl";
-    const url = Zotero.Prefs.get(prefKey, true);
-    return url || DEFAULT_API_BASE;
+    return getApiUrl();
   } catch {
     return DEFAULT_API_BASE;
   }
@@ -16,6 +16,7 @@ export interface ChatRequest {
   use_rag: boolean;
   provider?: string;
   model?: string;
+  skill_prompt?: string;
 }
 
 export interface ChatResponse {
@@ -67,10 +68,21 @@ export class APIClient {
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
+    // Inject provider/model from preferences if not explicitly set
+    const payload = { ...request };
+    if (!payload.provider) {
+      const provider = getLLMProvider();
+      if (provider) payload.provider = provider;
+    }
+    if (!payload.model) {
+      const model = getModelName();
+      if (model) payload.model = model;
+    }
+
     const response = await fetch(`${this.getBaseUrl()}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
+      body: JSON.stringify(payload),
     });
     return this.handleResponse(response);
   }

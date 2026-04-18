@@ -16,6 +16,8 @@ async function startup({ id, version, resourceURI, rootURI }, reason) {
   var manifestURI = Services.io.newURI(rootURI + "manifest.json");
   chromeHandle = aomStartup.registerChrome(manifestURI, [
     ["content", "zoteroAIRreader", rootURI + "content/"],
+    ["locale", "zoteroAIRreader", "en-US", rootURI + "locale/en-US/"],
+    ["locale", "zoteroAIRreader", "zh-CN", rootURI + "locale/zh-CN/"],
   ]);
 
   /**

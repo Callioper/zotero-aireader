@@ -1,31 +1,177 @@
 <linkset>
-  <html:link rel="localization" href="__addonRef__-preferences.ftl" />
+  <html:link rel="localization" href="__addonRef__-addon.ftl" />
 </linkset>
-<groupbox
-  onload="Zotero.__addonInstance__.hooks.onPrefsEvent('load', { window })"
->
+<groupbox>
   <label><html:h2 data-l10n-id="pref-title"></html:h2></label>
+
+  <!-- Enable/Disable -->
   <checkbox
     id="zotero-prefpane-__addonRef__-enable"
     preference="enable"
     data-l10n-id="pref-enable"
   />
-  <hbox>
+
+  <!-- LLM Service Configuration -->
+  <label><html:h3 data-l10n-id="pref-section-ai-service"></html:h3></label>
+
+  <hbox align="center">
     <html:label
-      for="zotero-prefpane-__addonRef__-api-url"
-      data-l10n-id="pref-api-url"
+      for="zotero-prefpane-__addonRef__-provider"
+      data-l10n-id="pref-llm-provider"
+      style="width: 140px;"
+    ></html:label>
+    <menulist
+      id="zotero-prefpane-__addonRef__-provider"
+      preference="llmProvider"
+      style="min-width: 200px;"
+    >
+      <menupopup>
+        <menuitem label="Ollama (local)" value="ollama" />
+        <menuitem label="LM Studio (local)" value="lmstudio" />
+        <menuitem label="DeepSeek" value="deepseek" />
+        <menuitem label="OpenAI" value="openai" />
+        <menuitem label="OpenAI Compatible" value="openai-compatible" />
+      </menupopup>
+    </menulist>
+  </hbox>
+
+  <hbox align="center">
+    <html:label
+      for="zotero-prefpane-__addonRef__-api-base-url"
+      data-l10n-id="pref-api-base-url"
+      style="width: 140px;"
     ></html:label>
     <html:input
       type="text"
-      id="zotero-prefpane-__addonRef__-api-url"
-      preference="apiUrl"
-      placeholder="http://127.0.0.1:8765/api"
-      style="width: 300px;"
+      id="zotero-prefpane-__addonRef__-api-base-url"
+      preference="apiBaseUrl"
+      placeholder="Leave empty for default"
+      style="flex: 1; min-width: 250px;"
     ></html:input>
   </hbox>
-  <hbox class="virtualized-table-container" flex="1" height="300px">
-    <html:div id="__addonRef__-table-container" />
+
+  <hbox align="center">
+    <html:label
+      for="zotero-prefpane-__addonRef__-api-key"
+      data-l10n-id="pref-api-key"
+      style="width: 140px;"
+    ></html:label>
+    <html:input
+      type="password"
+      id="zotero-prefpane-__addonRef__-api-key"
+      preference="apiKey"
+      placeholder="sk-... (not needed for Ollama)"
+      style="flex: 1; min-width: 250px;"
+    ></html:input>
   </hbox>
+
+  <hbox align="center">
+    <html:label
+      for="zotero-prefpane-__addonRef__-model"
+      data-l10n-id="pref-model-name"
+      style="width: 140px;"
+    ></html:label>
+    <html:input
+      type="text"
+      id="zotero-prefpane-__addonRef__-model"
+      preference="modelName"
+      placeholder="e.g. deepseek-chat, gpt-4o-mini, llama3"
+      style="flex: 1; min-width: 250px;"
+    ></html:input>
+  </hbox>
+
+  <hbox align="center">
+    <html:label
+      for="zotero-prefpane-__addonRef__-embedding-model"
+      data-l10n-id="pref-embedding-model"
+      style="width: 140px;"
+    ></html:label>
+    <html:input
+      type="text"
+      id="zotero-prefpane-__addonRef__-embedding-model"
+      preference="embeddingModel"
+      placeholder="e.g. nomic-embed-text, text-embedding-3-small"
+      style="flex: 1; min-width: 250px;"
+    ></html:input>
+  </hbox>
+
+  <separator class="thin" />
+
+  <!-- Feature Configuration -->
+  <label><html:h3 data-l10n-id="pref-section-features"></html:h3></label>
+
+  <hbox align="center">
+    <html:label
+      for="zotero-prefpane-__addonRef__-language"
+      data-l10n-id="pref-language"
+      style="width: 140px;"
+    ></html:label>
+    <menulist
+      id="zotero-prefpane-__addonRef__-language"
+      preference="language"
+      style="min-width: 200px;"
+    >
+      <menupopup>
+        <menuitem label="中文" value="zh" />
+        <menuitem label="English" value="en" />
+      </menupopup>
+    </menulist>
+  </hbox>
+
+  <checkbox
+    id="zotero-prefpane-__addonRef__-auto-index"
+    preference="autoIndex"
+    data-l10n-id="pref-auto-index"
+  />
+
+  <hbox align="center">
+    <html:label
+      for="zotero-prefpane-__addonRef__-history-rounds"
+      data-l10n-id="pref-history-rounds"
+      style="width: 140px;"
+    ></html:label>
+    <html:input
+      type="number"
+      id="zotero-prefpane-__addonRef__-history-rounds"
+      preference="historyRounds"
+      min="1"
+      max="50"
+      style="width: 80px;"
+    ></html:input>
+  </hbox>
+
+  <separator class="thin" />
+
+  <!-- Annotation Configuration -->
+  <label><html:h3 data-l10n-id="pref-section-annotations"></html:h3></label>
+
+  <checkbox
+    id="zotero-prefpane-__addonRef__-auto-highlight"
+    preference="autoHighlight"
+    data-l10n-id="pref-auto-highlight"
+  />
+
+  <hbox align="center">
+    <html:label
+      data-l10n-id="pref-color-summary"
+      style="width: 60px;"
+    ></html:label>
+    <html:input type="color" preference="colorSummary" style="width: 40px; height: 22px;" />
+    <html:label data-l10n-id="pref-color-concept" style="width: 60px; margin-left: 12px;" />
+    <html:input type="color" preference="colorConcept" style="width: 40px; height: 22px;" />
+    <html:label data-l10n-id="pref-color-argument" style="width: 60px; margin-left: 12px;" />
+    <html:input type="color" preference="colorArgument" style="width: 40px; height: 22px;" />
+  </hbox>
+
+  <hbox align="center">
+    <html:label data-l10n-id="pref-color-characters" style="width: 60px;" />
+    <html:input type="color" preference="colorCharacters" style="width: 40px; height: 22px;" />
+    <html:label data-l10n-id="pref-color-quotes" style="width: 60px; margin-left: 12px;" />
+    <html:input type="color" preference="colorQuotes" style="width: 40px; height: 22px;" />
+    <html:label data-l10n-id="pref-color-guide" style="width: 60px; margin-left: 12px;" />
+    <html:input type="color" preference="colorGuide" style="width: 40px; height: 22px;" />
+  </hbox>
+
 </groupbox>
 <vbox>
   <html:label

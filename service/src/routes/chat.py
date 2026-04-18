@@ -17,6 +17,7 @@ class ChatRequest(BaseModel):
     use_rag: bool = True
     provider: str | None = None
     model: str | None = None
+    skill_prompt: str | None = None  # Custom skill system prompt from frontend
 
 
 class Citation(BaseModel):
@@ -69,8 +70,18 @@ async def chat(req: ChatRequest):
         context = ""
         citations = []
 
-    ref_material = f"Reference Material:\n{context}" if context else ""
-    system_prompt = f"""You are an AI reading assistant. Answer user questions based on the reference material.
+    ref_material = f"\n\nReference Material:\n{context}" if context else ""
+
+    if req.skill_prompt:
+        # Use the skill-specific prompt, inject RAG context into it
+        system_prompt = f"""{req.skill_prompt}
+{ref_material}
+
+When citing original text, use 【N】 to indicate the source reference number.
+"""
+    else:
+        # Default generic assistant prompt
+        system_prompt = f"""You are an AI reading assistant. Answer user questions based on the reference material.
 {ref_material}
 
 Answer Requirements:

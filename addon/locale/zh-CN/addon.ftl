@@ -1,19 +1,66 @@
 startup-begin = 插件加载中
 startup-finish = 插件已就绪
-menuitem-label = 模板：辅助示例
-menupopup-label = 模板：弹出菜单
-menuitem-submenulabel = 模板
-menuitem-filemenulabel = 模板：文件菜单项
 prefs-title = AI 阅读器设置
 prefs-table-title = 标题
 prefs-table-detail = 详情
-tabpanel-lib-tab-label = 文献库标签页
-tabpanel-reader-tab-label = 阅读器标签页
 pref-title = AI 阅读器设置
 pref-enable = 启用 AI 阅读器
 pref-input = 输入
-pref-api-url = API 地址
-pref-help = { name } v{ version } ({ time })
-zotero-air-reader-menu-ai-chat = AI 问答
-zotero-air-reader-menu-summarize = 总结文献
-zotero-air-reader-menu-search = 语义搜索
+pref-help = { $name } v{ $version } ({ $time })
+
+# Preferences - Sections
+pref-section-ai-service = AI 服务配置
+pref-section-features = 功能配置
+pref-section-annotations = 标注配置
+
+# Preferences - AI Service
+pref-llm-provider = LLM 提供商
+pref-api-base-url = API 地址
+pref-api-key = API 密钥
+pref-model-name = 对话模型
+pref-embedding-model = Embedding 模型
+
+# Preferences - Features
+pref-language = 默认语言
+pref-auto-index = 打开 PDF 时自动建立索引
+pref-history-rounds = 对话保留轮数
+
+# Preferences - Annotations
+pref-auto-highlight = AI 引用自动创建高亮标注
+pref-color-summary = 摘要
+pref-color-concept = 概念
+pref-color-argument = 论证
+pref-color-characters = 人物
+pref-color-quotes = 金句
+pref-color-guide = 向导
+
+# Menu (XUL menu elements require .label attribute format)
+zotero-air-reader-menu-label =
+  .label = AI Reader
+zotero-air-reader-menu-ai-chat =
+  .label = AI 问答
+zotero-air-reader-menu-summarize =
+  .label = 总结文献
+zotero-air-reader-menu-search =
+  .label = 语义搜索
+
+# AI Panel (right sidebar)
+zotero-air-reader-panel-header = AI 阅读助手
+zotero-air-reader-panel-sidenav = AI 助手
+
+# AI Skills
+skill-summary = 智能摘要
+skill-summary-desc = 生成文献结构化摘要，提取核心论点和关键信息
+skill-concept = 概念解释
+skill-concept-desc = 深入解释文中的专业术语和抽象概念
+skill-argument = 论证分析
+skill-argument-desc = 分析论证结构、证据强度和逻辑漏洞
+skill-characters = 人物追踪
+skill-characters-desc = 提取文中人物和机构，分析关系网络
+skill-quotes = 金句收藏
+skill-quotes-desc = 发现并收藏文中精彩语句和名言
+skill-guide = 阅读向导
+skill-guide-desc = 提供阅读建议、思考问题和讨论话题
+
+# Reader toolbar
+reader-toolbar-ai-btn = AI 助手

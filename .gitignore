@@ -1,17 +1,36 @@
-# dot files
+# Build output
+.scaffold/
+dist/
+build/
+*.xpi
+
+# Dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
+Thumbs.db
 
-# Node.js
-node_modules
-pnpm-lock.yaml
-yarn.lock
+# Logs
+*.log
+npm-debug.log*
 
-# TSC
-tsconfig.tsbuildinfo
-
-# Scaffold
+# Environment
 .env
-.scaffold
-build
-logs
-* text=auto eol=lf
+.env.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Debug files
+debug-*.js
+test-*.js
