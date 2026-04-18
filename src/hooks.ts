@@ -13,6 +13,8 @@ async function onStartup() {
   registerNotifier();
   registerPrefs();
   registerStyle();
+
+  Zotero[config.addonInstance].data.initialized = true;
 }
 
 function onShutdown() {
