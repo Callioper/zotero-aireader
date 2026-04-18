@@ -119,17 +119,17 @@ function registerMenu() {
     menus: [
       {
         menuType: "menuitem",
-        l10nID: "zotero-air-reader-menu-ai-chat",
+        label: "AI Chat",
         onCommand: () => onAIChat(),
       },
       {
         menuType: "menuitem",
-        l10nID: "zotero-air-reader-menu-summarize",
+        label: "Summarize",
         onCommand: () => onSummarize(),
       },
       {
         menuType: "menuitem",
-        l10nID: "zotero-air-reader-menu-search",
+        label: "Semantic Search",
         onCommand: () => onSearch(),
       },
     ],
