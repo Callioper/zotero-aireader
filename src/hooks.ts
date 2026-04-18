@@ -10,6 +10,11 @@ async function onStartup() {
   await Zotero.uiReadyPromise;
 
   Zotero.debug("AI Reader: onStartup called");
+
+  // Initialize localization
+  const l10n = new Localization([`${config.addonRef}-addon.ftl`], true);
+  Zotero[config.addonInstance].data.locale = { current: l10n };
+
   registerNotifier();
   registerPrefs();
   registerStyle();
@@ -111,7 +116,7 @@ function onPrefsEvent(event: string, data: { window: Window }) {
 
 function registerMenu() {
   Zotero.debug("AI Reader: registerMenu called");
-  // Test: menuitem with label but NO onCommand
+  // Test: menuitem with l10nID
   Zotero.MenuManager.registerMenu({
     menuID: "zotero-air-reader-menu",
     pluginID: config.addonID,
@@ -119,7 +124,8 @@ function registerMenu() {
     menus: [
       {
         menuType: "menuitem",
-        label: "Test Label Only",
+        l10nID: "zotero-air-reader-menu-test",
+        onCommand: () => Zotero.debug("Test clicked"),
       },
     ],
   });
