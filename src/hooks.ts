@@ -114,15 +114,9 @@ function registerMenu() {
     target: "main/library/item",
     menus: [
       {
-        menuType: "separator",
-      },
-      {
         menuType: "menuitem",
         label: "Test Item",
         onCommand: () => Zotero.debug("Test clicked"),
-      },
-      {
-        menuType: "separator",
       },
     ],
   });
