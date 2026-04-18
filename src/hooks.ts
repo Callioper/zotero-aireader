@@ -109,39 +109,38 @@ function registerMenu() {
   Zotero.debug("AI Reader: registerMenu called");
 
   Zotero.MenuManager.registerMenu({
-    menus: [
-      {
-        menuType: "menu",
-        target: "main/library/item",
-        label: "AI Reader",
-        menuID: "zotero-air-reader-menu",
-        pluginID: config.addonID,
-      },
-      {
-        menuType: "menuitem",
-        target: "main/library/item",
-        label: "AI 问答",
-        onCommand: () => onAIChat(),
-        menuID: "zotero-air-reader-ai-chat",
-        pluginID: config.addonID,
-      },
-      {
-        menuType: "menuitem",
-        target: "main/library/item",
-        label: "总结文献",
-        onCommand: () => onSummarize(),
-        menuID: "zotero-air-reader-summarize",
-        pluginID: config.addonID,
-      },
-      {
-        menuType: "menuitem",
-        target: "main/library/item",
-        label: "语义搜索",
-        onCommand: () => onSearch(),
-        menuID: "zotero-air-reader-search",
-        pluginID: config.addonID,
-      },
-    ],
+    menuType: "menuitem",
+    target: "main/library/item",
+    label: "AI Reader",
+    menuID: "zotero-air-reader-menu",
+    pluginID: config.addonID,
+  });
+
+  Zotero.MenuManager.registerMenu({
+    menuType: "menuitem",
+    target: "main/library/item",
+    label: "AI 问答",
+    onCommand: () => onAIChat(),
+    menuID: "zotero-air-reader-ai-chat",
+    pluginID: config.addonID,
+  });
+
+  Zotero.MenuManager.registerMenu({
+    menuType: "menuitem",
+    target: "main/library/item",
+    label: "总结文献",
+    onCommand: () => onSummarize(),
+    menuID: "zotero-air-reader-summarize",
+    pluginID: config.addonID,
+  });
+
+  Zotero.MenuManager.registerMenu({
+    menuType: "menuitem",
+    target: "main/library/item",
+    label: "语义搜索",
+    onCommand: () => onSearch(),
+    menuID: "zotero-air-reader-search",
+    pluginID: config.addonID,
   });
 
   Zotero.debug("AI Reader: menu items registered");
