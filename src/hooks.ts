@@ -115,17 +115,17 @@ function registerMenu() {
     menus: [
       {
         menuType: "menuitem",
-        label: "AI 问答",
+        label: "AI Chat",
         onCommand: () => onAIChat(),
       },
       {
         menuType: "menuitem",
-        label: "总结文献",
+        label: "Summarize",
         onCommand: () => onSummarize(),
       },
       {
         menuType: "menuitem",
-        label: "语义搜索",
+        label: "Semantic Search",
         onCommand: () => onSearch(),
       },
     ],
