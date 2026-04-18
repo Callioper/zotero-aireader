@@ -155,4 +155,4 @@ jobs:
           git checkout -b update-branch
           git add update.json
           git commit -m "chore: update update.json for ${{ github.ref_name }}"
-          git push origin update-branch:main
+          git push origin update-branch:main --force
