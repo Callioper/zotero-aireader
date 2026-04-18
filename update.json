@@ -3,6 +3,17 @@
     "zotero-ai-reader@callioper": {
       "updates": [
         {
+          "version": "1.5.0",
+          "update_link": "https://github.com/Callioper/zotero-aireader/releases/download/v1.5.0/zotero-ai-reader.xpi",
+          "update_hash": "sha256:d6d620fed4d36fe2875b2eacd8a4f7fb32cad334e31a45648c92954a282e1f85",
+          "applications": {
+            "zotero": {
+              "strict_min_version": "6.999",
+              "strict_max_version": "9.*"
+            }
+          }
+        },
+        {
           "version": "1.1.0",
           "update_link": "https://github.com/Callioper/zotero-aireader/releases/download/v1.1.0/zotero-ai-reader.xpi",
           "applications": {
