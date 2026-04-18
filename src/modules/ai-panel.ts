@@ -1,26 +1,36 @@
 import { config } from "../../package.json";
-import { ALL_SKILLS, AISkill, SkillContext, ItemMetadata, extractQuotes } from "./skills";
-import { findAndNavigateToText, createAnnotationsFromQuotes, parseQuotes } from "./annotation-manager";
+import { ALL_SKILLS, AISkill, SkillContext, ItemMetadata } from "./skills";
+import { findAndNavigateToText, createAnnotationsFromQuotes } from "./annotation-manager";
 import { ExtractedQuote } from "./skills/types";
-import { isAutoHighlight, isAutoIndex, getSkillColor } from "../utils/prefs";
-import { llmChat, llmHealthCheck, LLMMessage } from "./llm-client";
+import { isAutoHighlight, isAutoIndex, getSkillColor, isEmbeddingEnabled } from "../utils/prefs";
+import { llmChat, LLMMessage, isChatConfigured } from "./llm-client";
 import { ragEngine } from "./rag-engine";
+import { truncateText } from "./pdf-text";
 
 declare const rootURI: string;
 
 /**
  * AI Panel - renders in the right-side item pane via Zotero.ItemPaneManager.registerSection()
  *
- * Layout:
+ * Layout (when configured):
  *   [Skill buttons bar]   - horizontal scrollable buttons for AI skills
  *   [Messages area]       - scrollable chat history
  *   [Input area]          - text input + send button
+ *
+ * Layout (when NOT configured):
+ *   [Setup guide]         - welcome message + "Open Settings" button
  */
+
+// ─── Constants ──────────────────────────────────────────────
+
+/** Max chars of full text to include directly in prompt (no RAG) */
+const MAX_CONTEXT_CHARS = 8000;
 
 // Per-item conversation state
 interface ConversationState {
   messages: Array<{ role: "user" | "assistant" | "info" | "error"; content: string }>;
   indexed: boolean;
+  indexing: boolean; // true while async indexing is in progress
   fullText: string | null;
   metadata: ItemMetadata | null;
 }
@@ -30,12 +40,10 @@ class AIPanel {
   private conversations: Map<number, ConversationState> = new Map();
   private currentItemId: number | null = null;
   private activeSkill: AISkill | null = null;
-  /** Selected text from the PDF reader (set externally via setSelectedText) */
   private pendingSelectedText: string | null = null;
 
   /**
    * Register the AI panel as a custom section in the item pane.
-   * Call this once during plugin startup.
    */
   register(): string | false {
     Zotero.debug("AI Reader: registering AI panel section");
@@ -44,16 +52,15 @@ class AIPanel {
       paneID: "zotero-ai-reader-panel",
       pluginID: config.addonID,
       header: {
-        l10nID: "zotero-air-reader-panel-header",
+        l10nID: `${config.addonRef}-zotero-air-reader-panel-header`,
         icon: `chrome://zoteroAIRreader/content/icons/icon16.svg`,
       },
       sidenav: {
-        l10nID: "zotero-air-reader-panel-sidenav",
+        l10nID: `${config.addonRef}-zotero-air-reader-panel-sidenav`,
         icon: `chrome://zoteroAIRreader/content/icons/icon20.svg`,
       },
 
       onInit: ({ body }) => {
-        Zotero.debug("AI Reader: panel section initialized");
         body.style.padding = "0";
       },
 
@@ -62,7 +69,6 @@ class AIPanel {
       },
 
       onItemChange: ({ item, tabType, setEnabled }) => {
-        // Enable the panel when in reader tab or when viewing an item with PDF attachments
         if (tabType === "reader") {
           setEnabled(true);
           return;
@@ -80,7 +86,6 @@ class AIPanel {
       },
 
       onRender: ({ doc, body, item }) => {
-        // Clear previous content
         body.replaceChildren();
 
         if (!item) {
@@ -90,30 +95,35 @@ class AIPanel {
 
         const itemId = this.resolveItemId(item);
         this.currentItemId = itemId;
-
-        // Extract and cache metadata
         this.cacheMetadata(itemId, item);
 
-        // Build the panel UI
+        // Check if chat is configured — if not, show setup guide
+        if (!isChatConfigured()) {
+          this.buildSetupUI(doc, body);
+          return;
+        }
+
         this.buildUI(doc, body, itemId);
       },
 
       onAsyncRender: async ({ body, item }) => {
         if (!item) return;
         const itemId = this.resolveItemId(item);
-        const conv = this.getConversation(itemId);
 
-        // Auto-index the document on first view (if preference enabled)
-        if (!conv.indexed && isAutoIndex()) {
-          await this.indexDocument(itemId, item, body);
-        }
-        if (!conv.fullText) {
-          await this.cacheFullText(itemId, item);
+        // Only cache full text — NO automatic API calls
+        await this.cacheFullText(itemId, item);
+
+        // If embedding enabled + autoIndex, start async indexing (non-blocking)
+        if (isAutoIndex() && !this.getConversation(itemId).indexed) {
+          const conv = this.getConversation(itemId);
+          if (conv.fullText && !conv.indexing) {
+            conv.indexing = true;
+            ragEngine.indexDocumentAsync(itemId, conv.fullText);
+          }
         }
       },
 
       onToggle: ({ body, item }) => {
-        // Scroll messages to bottom when section is toggled open
         if (item) {
           const messagesEl = body.querySelector(".air-messages") as HTMLElement | null;
           if (messagesEl) {
@@ -127,40 +137,24 @@ class AIPanel {
     return this.sectionID;
   }
 
-  /**
-   * Unregister the panel section. Call during plugin shutdown.
-   */
   unregister() {
     if (this.sectionID) {
       Zotero.ItemPaneManager.unregisterSection(this.sectionID);
-      Zotero.debug("AI Reader: panel section unregistered");
       this.sectionID = false;
     }
     this.conversations.clear();
   }
 
-  /**
-   * Set selected text from the Reader's text selection popup.
-   * Called externally by the text selection event handler in hooks.ts.
-   */
   setSelectedText(text: string) {
     this.pendingSelectedText = text;
-    Zotero.debug(`AI Reader: selected text set (${text.length} chars)`);
   }
 
-  /**
-   * Get the currently active item ID (for external coordination).
-   */
   getCurrentItemId(): number | null {
     return this.currentItemId;
   }
 
   // ─── Item Resolution ──────────────────────────────────────
 
-  /**
-   * Resolve the effective item ID for conversation tracking.
-   * If the item is an attachment, use its ID; if regular, find first PDF attachment.
-   */
   private resolveItemId(item: any): number {
     if (item.isAttachment() && item.isPDFAttachment?.()) {
       return item.id;
@@ -182,6 +176,7 @@ class AIPanel {
       this.conversations.set(itemId, {
         messages: [],
         indexed: false,
+        indexing: false,
         fullText: null,
         metadata: null,
       });
@@ -189,14 +184,13 @@ class AIPanel {
     return this.conversations.get(itemId)!;
   }
 
-  // ─── Metadata & Text Caching ──────────────────────────────
+  // ─── Metadata & Text Caching (no API calls) ──────────────
 
   private cacheMetadata(itemId: number, item: any) {
     const conv = this.getConversation(itemId);
     if (conv.metadata) return;
 
     try {
-      // Navigate to the parent regular item if this is an attachment
       let regularItem = item;
       if (item.isAttachment()) {
         const parentId = item.parentID;
@@ -226,6 +220,8 @@ class AIPanel {
 
   private async cacheFullText(itemId: number, item: any) {
     const conv = this.getConversation(itemId);
+    if (conv.fullText) return;
+
     try {
       let attachment: any = null;
 
@@ -252,13 +248,73 @@ class AIPanel {
     }
   }
 
-  // ─── UI Building ──────────────────────────────────────────
+  // ─── Setup Guide UI (shown when not configured) ──────────
+
+  private buildSetupUI(doc: Document, body: HTMLElement) {
+    const container = doc.createElement("div");
+    container.className = "air-container";
+    container.style.cssText = "display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; text-align: center; min-height: 200px;";
+
+    const icon = doc.createElement("div");
+    icon.textContent = "\u{1F916}";
+    icon.style.cssText = "font-size: 36px; margin-bottom: 12px;";
+    container.appendChild(icon);
+
+    const title = doc.createElement("div");
+    title.style.cssText = "font-size: 15px; font-weight: 600; margin-bottom: 12px;";
+    title.dataset.l10nId = `${config.addonRef}-setup-welcome`;
+    container.appendChild(title);
+
+    const steps = doc.createElement("div");
+    steps.style.cssText = "font-size: 13px; color: #666; margin-bottom: 16px; text-align: left;";
+
+    const step1 = doc.createElement("div");
+    step1.style.marginBottom = "4px";
+    step1.textContent = "1. ";
+    const step1Text = doc.createElement("span");
+    step1Text.dataset.l10nId = `${config.addonRef}-setup-step1`;
+    step1.appendChild(step1Text);
+    steps.appendChild(step1);
+
+    const step2 = doc.createElement("div");
+    step2.textContent = "2. ";
+    const step2Text = doc.createElement("span");
+    step2Text.dataset.l10nId = `${config.addonRef}-setup-step2`;
+    step2.appendChild(step2Text);
+    steps.appendChild(step2);
+
+    container.appendChild(steps);
+
+    const btn = doc.createElement("button");
+    btn.style.cssText = "padding: 8px 20px; border-radius: 6px; border: 1px solid #ccc; background: #0078d7; color: white; cursor: pointer; font-size: 13px;";
+    btn.dataset.l10nId = `${config.addonRef}-setup-open-settings`;
+    btn.addEventListener("click", () => {
+      try {
+        // Zotero 7+: openPreferences accepts paneID to jump to
+        const mainWin = Zotero.getMainWindow();
+        if (mainWin?.openDialog) {
+          mainWin.openDialog(
+            "chrome://zotero/content/preferences/preferences.xhtml",
+            "zotero-prefs",
+            "chrome,titlebar,toolbar,centerscreen",
+            { pane: config.addonID },
+          );
+        }
+      } catch (e) {
+        Zotero.debug("AI Reader: failed to open preferences: " + e);
+      }
+    });
+    container.appendChild(btn);
+
+    body.appendChild(container);
+  }
+
+  // ─── Main Chat UI ─────────────────────────────────────────
 
   private buildUI(doc: Document, body: HTMLElement, itemId: number) {
     const container = doc.createElement("div");
     container.className = "air-container";
 
-    // l10n prefix for dynamic elements (scaffold prefixes all ftl IDs with addonRef)
     const l10nPrefix = config.addonRef;
 
     // Skill buttons bar
@@ -270,14 +326,13 @@ class AIPanel {
       if (this.activeSkill?.id === skill.id) {
         btn.classList.add("air-skill-btn-active");
       }
-      // Use l10n: set data-l10n-id with addonRef prefix for localized labels
       const iconSpan = doc.createElement("span");
       iconSpan.textContent = skill.icon + " ";
       btn.appendChild(iconSpan);
       const labelSpan = doc.createElement("span");
       labelSpan.dataset.l10nId = `${l10nPrefix}-${skill.nameKey}`;
       btn.appendChild(labelSpan);
-      btn.title = skill.descriptionKey; // Fallback tooltip (l10n applied separately)
+      btn.title = skill.descriptionKey;
       btn.dataset.skillId = skill.id;
       btn.addEventListener("click", () => this.onSkillClick(skill, body, itemId));
       skillsBar.appendChild(btn);
@@ -288,7 +343,6 @@ class AIPanel {
     const messages = doc.createElement("div");
     messages.className = "air-messages";
 
-    // Restore existing conversation messages
     const conv = this.getConversation(itemId);
     for (const msg of conv.messages) {
       messages.appendChild(this.createMessageElement(doc, msg.role, msg.content));
@@ -301,7 +355,7 @@ class AIPanel {
 
     const textarea = doc.createElement("textarea");
     textarea.className = "air-input";
-    textarea.placeholder = "输入问题，或点击上方技能按钮...";
+    textarea.placeholder = "\u8f93\u5165\u95ee\u9898\uff0c\u6216\u70b9\u51fb\u4e0a\u65b9\u6280\u80fd\u6309\u94ae...";
     textarea.rows = 2;
     textarea.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -313,14 +367,13 @@ class AIPanel {
 
     const sendBtn = doc.createElement("button");
     sendBtn.className = "air-send-btn";
-    sendBtn.textContent = "发送";
+    sendBtn.textContent = "\u53d1\u9001";
     sendBtn.addEventListener("click", () => this.onSend(body, itemId));
     inputArea.appendChild(sendBtn);
 
     container.appendChild(inputArea);
     body.appendChild(container);
 
-    // Scroll to bottom
     requestAnimationFrame(() => {
       messages.scrollTop = messages.scrollHeight;
     });
@@ -333,9 +386,7 @@ class AIPanel {
     if (role === "user") {
       el.textContent = content;
     } else if (role === "assistant") {
-      // Render with quote highlighting and locate buttons
       el.innerHTML = this.renderAssistantMessage(content);
-      // Attach click handlers for quote locate buttons
       el.querySelectorAll(".air-quote-locate").forEach((btn) => {
         btn.addEventListener("click", (e) => {
           const quoteText = (e.target as HTMLElement).dataset.quote || "";
@@ -343,7 +394,6 @@ class AIPanel {
         });
       });
     } else {
-      // info, error
       el.textContent = content;
     }
 
@@ -351,29 +401,24 @@ class AIPanel {
   }
 
   private renderAssistantMessage(text: string): string {
-    // Escape HTML
     let html = text
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
 
-    // Markdown basics
     html = html
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/`(.*?)`/g, "<code>$1</code>");
 
-    // Replace [[QUOTE: "..."]] with styled quote blocks + locate button
     html = html.replace(
       /\[\[QUOTE:\s*&quot;(.*?)&quot;\]\]/g,
       (_match, quoteText) => {
         const escaped = quoteText.replace(/"/g, "&quot;");
-        return `<span class="air-quote-ref">${quoteText}</span><button class="air-quote-locate" data-quote="${escaped}" title="定位原文">📍</button>`;
+        return `<span class="air-quote-ref">${quoteText}</span><button class="air-quote-locate" data-quote="${escaped}" title="\u5b9a\u4f4d\u539f\u6587">\u{1F4CD}</button>`;
       },
     );
 
-    // Newlines to <br>
     html = html.replace(/\n/g, "<br>");
-
     return html;
   }
 
@@ -384,7 +429,6 @@ class AIPanel {
     const conv = this.getConversation(itemId);
     const doc = body.ownerDocument;
 
-    // Update button active states
     body.querySelectorAll(".air-skill-btn").forEach((btn) => {
       const el = btn as HTMLElement;
       if (el.dataset.skillId === skill.id) {
@@ -394,19 +438,13 @@ class AIPanel {
       }
     });
 
-    // Build skill context
     const context = this.buildSkillContext(itemId);
-
-    // Add a user message showing which skill was activated
-    const userMsg = `[技能] ${skill.icon} ${skill.nameKey}`;
+    const userMsg = `[\u6280\u80fd] ${skill.icon} ${skill.nameKey}`;
     conv.messages.push({ role: "user", content: userMsg });
     this.appendMessage(body, doc, "user", userMsg);
 
-    // Build the full prompt using the skill
     const systemPrompt = skill.buildSystemPrompt(context);
     const userMessage = skill.buildUserMessage(context);
-
-    // Clear the pending selected text after use
     this.pendingSelectedText = null;
 
     await this.sendToLLM(body, itemId, userMessage, doc, systemPrompt, skill);
@@ -424,7 +462,6 @@ class AIPanel {
     conv.messages.push({ role: "user", content: question });
     this.appendMessage(body, doc, "user", question);
 
-    // If a skill is active, use its prompt system
     let systemPrompt: string | undefined;
     let userMessage: string;
 
@@ -443,10 +480,7 @@ class AIPanel {
   private async onLocateQuote(quoteText: string) {
     if (!this.currentItemId) return;
     Zotero.debug(`AI Reader: locate quote: "${quoteText.substring(0, 50)}..."`);
-    const found = await findAndNavigateToText(this.currentItemId, quoteText);
-    if (!found) {
-      Zotero.debug("AI Reader: could not navigate to quote in reader");
-    }
+    await findAndNavigateToText(this.currentItemId, quoteText);
   }
 
   // ─── Skill Context Building ───────────────────────────────
@@ -461,7 +495,7 @@ class AIPanel {
     };
   }
 
-  // ─── LLM Communication (built-in, no backend needed) ───────
+  // ─── LLM Communication ────────────────────────────────────
 
   private async sendToLLM(
     body: HTMLElement,
@@ -473,48 +507,57 @@ class AIPanel {
   ) {
     const conv = this.getConversation(itemId);
 
-    // Show loading indicator
-    const loadingMsg = "思考中...";
+    const loadingMsg = "\u601d\u8003\u4e2d...";
     conv.messages.push({ role: "info", content: loadingMsg });
     const loadingEl = this.appendMessage(body, doc, "info", loadingMsg);
 
     this.setInputEnabled(body, false);
 
     try {
-      // Build RAG context from indexed document
-      let ragContext = "";
-      if (ragEngine.isIndexed(itemId)) {
-        const results = await ragEngine.search(itemId, question, 5);
-        ragContext = ragEngine.buildContext(results);
+      // Build context: RAG if available, otherwise truncated full text
+      let contextBlock = "";
+
+      if (isEmbeddingEnabled() && ragEngine.isIndexed(itemId)) {
+        // Use RAG search
+        try {
+          const results = await ragEngine.search(itemId, question, 5);
+          contextBlock = ragEngine.buildContext(results);
+        } catch (e) {
+          Zotero.debug("AI Reader: RAG search failed, using full text fallback: " + e);
+        }
+      }
+
+      // Fallback: truncated full text as context
+      if (!contextBlock && conv.fullText) {
+        contextBlock = "\u53c2\u8003\u6750\u6599:\n" + truncateText(conv.fullText, MAX_CONTEXT_CHARS);
+      }
+
+      // Trigger async indexing in background if embedding enabled but not yet indexed
+      if (isEmbeddingEnabled() && !conv.indexed && !conv.indexing && conv.fullText) {
+        conv.indexing = true;
+        ragEngine.indexDocumentAsync(itemId, conv.fullText);
       }
 
       // Build LLM messages
       const messages: LLMMessage[] = [];
-
-      // System prompt: skill-specific or default, with RAG context
-      const systemContent = this.buildSystemMessage(skillPrompt, ragContext);
+      const systemContent = this.buildSystemMessage(skillPrompt, contextBlock);
       messages.push({ role: "system", content: systemContent });
-
-      // User message
       messages.push({ role: "user", content: question });
 
-      // Call LLM directly
       const answer = await llmChat({ messages });
 
       // Remove loading message
       conv.messages.pop();
       loadingEl.remove();
 
-      // Parse through skill if available
       let displayContent: string;
       if (skill) {
         const result = skill.parseResult(answer);
         displayContent = answer;
         if (result.quotes.length > 0) {
-          displayContent += `\n\n_已提取 ${result.quotes.length} 条原文引用，可点击 📍 定位原文_`;
+          displayContent += `\n\n_\u5df2\u63d0\u53d6 ${result.quotes.length} \u6761\u539f\u6587\u5f15\u7528\uff0c\u53ef\u70b9\u51fb \u{1F4CD} \u5b9a\u4f4d\u539f\u6587_`;
         }
 
-        // Auto-create annotations from extracted quotes
         if (result.quotes.length > 0 && isAutoHighlight()) {
           this.createQuoteAnnotations(itemId, result.quotes, skill, body, doc);
         }
@@ -525,11 +568,10 @@ class AIPanel {
       conv.messages.push({ role: "assistant", content: displayContent });
       this.appendMessage(body, doc, "assistant", displayContent);
     } catch (error) {
-      // Remove loading message
       conv.messages.pop();
       loadingEl.remove();
 
-      const errMsg = `请求失败: ${error}`;
+      const errMsg = `\u8bf7\u6c42\u5931\u8d25: ${error}`;
       conv.messages.push({ role: "error", content: errMsg });
       this.appendMessage(body, doc, "error", errMsg);
     } finally {
@@ -537,19 +579,16 @@ class AIPanel {
     }
   }
 
-  private buildSystemMessage(skillPrompt?: string, ragContext?: string): string {
-    const contextBlock = ragContext ? `\n\n${ragContext}` : "";
+  private buildSystemMessage(skillPrompt?: string, contextBlock?: string): string {
+    const ctx = contextBlock ? `\n\n${contextBlock}` : "";
 
     if (skillPrompt) {
-      return `${skillPrompt}${contextBlock}\n\n引用原文时使用 [[QUOTE: "原文"]] 格式标记。`;
+      return `${skillPrompt}${ctx}\n\n\u5f15\u7528\u539f\u6587\u65f6\u4f7f\u7528 [[QUOTE: "\u539f\u6587"]] \u683c\u5f0f\u6807\u8bb0\u3002`;
     }
 
-    return `你是一位 AI 阅读助手。请根据参考材料回答用户问题。${contextBlock}\n\n回答要求:\n1. 基于参考材料回答\n2. 准确简洁\n3. 引用原文时使用 [[QUOTE: "原文"]] 格式标记\n4. 材料不足时说明无法回答`;
+    return `\u4f60\u662f\u4e00\u4f4d AI \u9605\u8bfb\u52a9\u624b\u3002\u8bf7\u6839\u636e\u53c2\u8003\u6750\u6599\u56de\u7b54\u7528\u6237\u95ee\u9898\u3002${ctx}\n\n\u56de\u7b54\u8981\u6c42:\n1. \u57fa\u4e8e\u53c2\u8003\u6750\u6599\u56de\u7b54\n2. \u51c6\u786e\u7b80\u6d01\n3. \u5f15\u7528\u539f\u6587\u65f6\u4f7f\u7528 [[QUOTE: "\u539f\u6587"]] \u683c\u5f0f\u6807\u8bb0\n4. \u6750\u6599\u4e0d\u8db3\u65f6\u8bf4\u660e\u65e0\u6cd5\u56de\u7b54`;
   }
 
-  /**
-   * Create Zotero annotations from extracted quotes (runs in background).
-   */
   private async createQuoteAnnotations(
     itemId: number,
     quotes: ExtractedQuote[],
@@ -558,20 +597,13 @@ class AIPanel {
     doc: Document,
   ) {
     try {
-      // Use color from preferences (user-customizable) with fallback to skill default
       const color = getSkillColor(skill.id) || skill.color;
-
-      const results = await createAnnotationsFromQuotes(
-        itemId,
-        quotes,
-        color,
-        skill.nameKey,
-      );
+      const results = await createAnnotationsFromQuotes(itemId, quotes, color, skill.nameKey);
       const successCount = results.filter((r) => r.success).length;
       if (successCount > 0) {
         const highlightCount = results.filter((r) => r.type === "highlight" && r.success).length;
         const noteCount = results.filter((r) => r.type === "note" && r.success).length;
-        const msg = `已创建 ${successCount} 条标注（${highlightCount} 高亮 / ${noteCount} 笔记）`;
+        const msg = `\u5df2\u521b\u5efa ${successCount} \u6761\u6807\u6ce8\uff08${highlightCount} \u9ad8\u4eae / ${noteCount} \u7b14\u8bb0\uff09`;
         this.appendMessage(body, doc, "info", msg);
       }
     } catch (e) {
@@ -584,7 +616,6 @@ class AIPanel {
   private appendMessage(body: HTMLElement, doc: Document, role: string, content: string): HTMLElement {
     const messagesEl = body.querySelector(".air-messages");
     if (!messagesEl) {
-      Zotero.debug("AI Reader: messages container not found");
       return doc.createElement("div");
     }
     const el = this.createMessageElement(doc, role, content);
@@ -602,43 +633,6 @@ class AIPanel {
     if (sendBtn) sendBtn.disabled = !enabled;
     skillBtns.forEach((btn) => ((btn as HTMLButtonElement).disabled = !enabled));
   }
-
-  // ─── Indexing ─────────────────────────────────────────────
-
-  private async indexDocument(itemId: number, item: any, body: HTMLElement) {
-    const conv = this.getConversation(itemId);
-    const doc = body.ownerDocument;
-
-    try {
-      // Get full text from PDF for built-in RAG
-      if (!conv.fullText) {
-        await this.cacheFullText(itemId, item);
-      }
-
-      if (!conv.fullText) {
-        this.appendMessage(body, doc, "error", "无法获取 PDF 文本内容");
-        return;
-      }
-
-      this.appendMessage(body, doc, "info", "正在建立索引（分块 + 向量化）...");
-
-      // Index using built-in RAG engine
-      await ragEngine.indexDocument(itemId, conv.fullText);
-      conv.indexed = true;
-
-      const successMsg = "索引建立完成，可以开始提问了。";
-      conv.messages.push({ role: "info", content: successMsg });
-      this.appendMessage(body, doc, "info", successMsg);
-    } catch (error) {
-      // If embedding fails, RAG falls back to keyword search
-      // Mark as indexed anyway so the user can still chat
-      conv.indexed = true;
-      const warnMsg = `索引部分完成（将使用关键词搜索）: ${error}`;
-      conv.messages.push({ role: "info", content: warnMsg });
-      this.appendMessage(body, doc, "info", warnMsg);
-    }
-  }
-
 }
 
 export const aiPanel = new AIPanel();

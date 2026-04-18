@@ -45,9 +45,14 @@ export function getLanguage(): string {
   return (getPref("language") as string) || "zh";
 }
 
-/** Auto-index PDF when opened */
+/** Whether embedding / RAG is enabled */
+export function isEmbeddingEnabled(): boolean {
+  return getPref("embeddingEnabled") === true;
+}
+
+/** Auto-index PDF when opened (only meaningful when embedding is enabled) */
 export function isAutoIndex(): boolean {
-  return getPref("autoIndex") !== false;
+  return isEmbeddingEnabled() && getPref("autoIndex") !== false;
 }
 
 /** Number of conversation rounds to keep */

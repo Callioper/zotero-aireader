@@ -11,8 +11,9 @@
     data-l10n-id="pref-enable"
   />
 
-  <!-- LLM Service Configuration -->
-  <label><html:h3 data-l10n-id="pref-section-ai-service"></html:h3></label>
+  <!-- ═══ Chat LLM Configuration ═══ -->
+  <label><html:h3 data-l10n-id="pref-section-chat"></html:h3></label>
+  <html:p data-l10n-id="pref-section-chat-desc" style="color: #666; font-size: 12px; margin: 0 0 8px 0;"></html:p>
 
   <hbox align="center">
     <html:label
@@ -80,6 +81,18 @@
     ></html:input>
   </hbox>
 
+  <separator class="thin" />
+
+  <!-- ═══ Embedding Configuration (Optional) ═══ -->
+  <label><html:h3 data-l10n-id="pref-section-embedding"></html:h3></label>
+  <html:p data-l10n-id="pref-section-embedding-desc" style="color: #666; font-size: 12px; margin: 0 0 8px 0;"></html:p>
+
+  <checkbox
+    id="zotero-prefpane-__addonRef__-embedding-enabled"
+    preference="embeddingEnabled"
+    data-l10n-id="pref-embedding-enabled"
+  />
+
   <hbox align="center">
     <html:label
       for="zotero-prefpane-__addonRef__-embedding-model"
@@ -95,9 +108,15 @@
     ></html:input>
   </hbox>
 
+  <checkbox
+    id="zotero-prefpane-__addonRef__-auto-index"
+    preference="autoIndex"
+    data-l10n-id="pref-auto-index"
+  />
+
   <separator class="thin" />
 
-  <!-- Feature Configuration -->
+  <!-- ═══ Feature Configuration ═══ -->
   <label><html:h3 data-l10n-id="pref-section-features"></html:h3></label>
 
   <hbox align="center">
@@ -118,12 +137,6 @@
     </menulist>
   </hbox>
 
-  <checkbox
-    id="zotero-prefpane-__addonRef__-auto-index"
-    preference="autoIndex"
-    data-l10n-id="pref-auto-index"
-  />
-
   <hbox align="center">
     <html:label
       for="zotero-prefpane-__addonRef__-history-rounds"
@@ -142,7 +155,7 @@
 
   <separator class="thin" />
 
-  <!-- Annotation Configuration -->
+  <!-- ═══ Annotation Configuration ═══ -->
   <label><html:h3 data-l10n-id="pref-section-annotations"></html:h3></label>
 
   <checkbox

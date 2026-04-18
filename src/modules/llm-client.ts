@@ -2,12 +2,18 @@
  * Built-in LLM Client
  *
  * Calls OpenAI-compatible API endpoints directly from the plugin.
- * Supports: OpenAI, DeepSeek, Ollama, LM Studio, Claude (via proxy), any OpenAI-compatible server.
+ * Supports: OpenAI, DeepSeek, Ollama, LM Studio, any OpenAI-compatible server.
  *
- * No Python backend required.
+ * All fetch calls use AbortController for timeout control to prevent
+ * blocking the Zotero main thread.
  */
 
 import { getPref } from "../utils/prefs";
+
+// ─── Timeout defaults (ms) ─────────────────────────────────
+const CHAT_TIMEOUT = 60_000;       // 60s for chat completions
+const EMBED_TIMEOUT = 30_000;      // 30s for embedding
+const HEALTH_CHECK_TIMEOUT = 8_000; // 8s for health checks
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant";
@@ -18,10 +24,13 @@ export interface LLMChatOptions {
   messages: LLMMessage[];
   temperature?: number;
   maxTokens?: number;
+  /** Override timeout in ms */
+  timeout?: number;
 }
 
-export interface LLMEmbeddingResult {
-  embedding: number[];
+export interface LLMEmbedOptions {
+  /** Override timeout in ms */
+  timeout?: number;
 }
 
 /** Provider-specific endpoint configuration */
@@ -29,7 +38,6 @@ interface ProviderConfig {
   chatPath: string;
   embeddingPath: string;
   authHeader: (apiKey: string) => Record<string, string>;
-  chatBodyTransform?: (body: any) => any;
 }
 
 const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
@@ -47,10 +55,6 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     chatPath: "/v1/chat/completions",
     embeddingPath: "/api/embed",
     authHeader: () => ({}),
-    chatBodyTransform: (body: any) => {
-      // Ollama's OpenAI-compatible endpoint works as-is
-      return body;
-    },
   },
   lmstudio: {
     chatPath: "/v1/chat/completions",
@@ -103,8 +107,19 @@ function getDefaultEmbeddingModel(provider: string): string {
   }
 }
 
+// ─── Timeout-aware fetch ────────────────────────────────────
+
+function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
+// ─── Chat ───────────────────────────────────────────────────
+
 /**
  * Chat completion - call LLM with messages.
+ * Has built-in timeout (default 60s) to prevent blocking.
  */
 export async function llmChat(options: LLMChatOptions): Promise<string> {
   const { baseUrl, apiKey, model, provider } = getConfig();
@@ -116,24 +131,29 @@ export async function llmChat(options: LLMChatOptions): Promise<string> {
     ...providerCfg.authHeader(apiKey),
   };
 
-  let body: any = {
+  const body: any = {
     model,
     messages: options.messages,
     temperature: options.temperature ?? 0.7,
     max_tokens: options.maxTokens ?? 4096,
   };
 
-  if (providerCfg.chatBodyTransform) {
-    body = providerCfg.chatBodyTransform(body);
-  }
-
   Zotero.debug(`AI Reader LLM: POST ${url} model=${model}`);
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  const timeout = options.timeout ?? CHAT_TIMEOUT;
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    }, timeout);
+  } catch (e: any) {
+    if (e.name === "AbortError") {
+      throw new Error(`Chat request timed out after ${timeout / 1000}s — check if the LLM service is running`);
+    }
+    throw e;
+  }
 
   if (!response.ok) {
     const errText = await response.text();
@@ -155,10 +175,13 @@ export async function llmChat(options: LLMChatOptions): Promise<string> {
   throw new Error("Unexpected LLM response format: " + JSON.stringify(data).substring(0, 200));
 }
 
+// ─── Embedding ──────────────────────────────────────────────
+
 /**
  * Get text embeddings from the configured API.
+ * Has built-in timeout (default 30s) to prevent blocking.
  */
-export async function llmEmbed(texts: string[]): Promise<number[][]> {
+export async function llmEmbed(texts: string[], options?: LLMEmbedOptions): Promise<number[][]> {
   const { baseUrl, apiKey, embeddingModel, provider } = getConfig();
   const providerCfg = PROVIDER_CONFIGS[provider] || PROVIDER_CONFIGS["openai-compatible"];
 
@@ -168,9 +191,11 @@ export async function llmEmbed(texts: string[]): Promise<number[][]> {
     ...providerCfg.authHeader(apiKey),
   };
 
+  const timeout = options?.timeout ?? EMBED_TIMEOUT;
+
   // Ollama uses a different embedding API format
   if (provider === "ollama") {
-    return await ollamaEmbed(url, headers, texts, embeddingModel);
+    return await ollamaEmbed(url, headers, texts, embeddingModel, timeout);
   }
 
   // OpenAI-compatible embedding API
@@ -181,11 +206,19 @@ export async function llmEmbed(texts: string[]): Promise<number[][]> {
 
   Zotero.debug(`AI Reader Embed: POST ${url} model=${embeddingModel} texts=${texts.length}`);
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    }, timeout);
+  } catch (e: any) {
+    if (e.name === "AbortError") {
+      throw new Error(`Embedding request timed out after ${timeout / 1000}s`);
+    }
+    throw e;
+  }
 
   if (!response.ok) {
     const errText = await response.text();
@@ -207,20 +240,26 @@ async function ollamaEmbed(
   headers: Record<string, string>,
   texts: string[],
   model: string,
+  timeout: number,
 ): Promise<number[][]> {
-  const results: number[][] = [];
-
-  // Ollama /api/embed supports batch via "input" array
   const body = {
     model,
     input: texts,
   };
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    }, timeout);
+  } catch (e: any) {
+    if (e.name === "AbortError") {
+      throw new Error(`Ollama embedding timed out after ${timeout / 1000}s`);
+    }
+    throw e;
+  }
 
   if (!response.ok) {
     const errText = await response.text();
@@ -229,12 +268,10 @@ async function ollamaEmbed(
 
   const data = await response.json();
 
-  // Ollama returns { embeddings: [[...], [...]] }
   if (data.embeddings && Array.isArray(data.embeddings)) {
     return data.embeddings;
   }
 
-  // Single embedding fallback
   if (data.embedding) {
     return [data.embedding];
   }
@@ -242,17 +279,43 @@ async function ollamaEmbed(
   throw new Error("Unexpected Ollama embedding response format");
 }
 
+// ─── Health Checks ──────────────────────────────────────────
+
 /**
- * Test the LLM connection by sending a simple ping.
+ * Test Chat LLM connectivity. Fast timeout (8s).
  */
-export async function llmHealthCheck(): Promise<{ ok: boolean; error?: string }> {
+export async function llmChatHealthCheck(): Promise<{ ok: boolean; error?: string }> {
   try {
     const result = await llmChat({
       messages: [{ role: "user", content: "Hi, reply with just 'ok'" }],
       maxTokens: 10,
+      timeout: HEALTH_CHECK_TIMEOUT,
     });
     return { ok: !!result };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
+}
+
+/**
+ * Test Embedding API connectivity. Fast timeout (8s).
+ */
+export async function llmEmbedHealthCheck(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const result = await llmEmbed(["test"], { timeout: HEALTH_CHECK_TIMEOUT });
+    return { ok: Array.isArray(result) && result.length > 0 };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+/** Check if chat model appears to be configured (non-empty provider + base URL) */
+export function isChatConfigured(): boolean {
+  const { baseUrl, model } = getConfig();
+  return !!(baseUrl && model);
+}
+
+/** Check if embedding is enabled in preferences */
+export function isEmbeddingEnabled(): boolean {
+  return getPref("embeddingEnabled") === true;
 }

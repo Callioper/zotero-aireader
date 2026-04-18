@@ -12,6 +12,7 @@ declare namespace _ZoteroTypes {
       "apiBaseUrl": string;
       "apiKey": string;
       "modelName": string;
+      "embeddingEnabled": boolean;
       "embeddingModel": string;
       "language": string;
       "autoIndex": boolean;

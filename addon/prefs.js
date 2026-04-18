@@ -4,16 +4,19 @@
 // General
 pref("enable", true);
 
-// LLM Service (built-in, direct API calls)
+// Chat LLM (required)
 pref("llmProvider", "ollama");
 pref("apiBaseUrl", "");
 pref("apiKey", "");
 pref("modelName", "");
+
+// Embedding (optional — disabled by default)
+pref("embeddingEnabled", false);
 pref("embeddingModel", "");
 
 // Features
 pref("language", "zh");
-pref("autoIndex", true);
+pref("autoIndex", false);
 pref("historyRounds", 10);
 
 // Annotations

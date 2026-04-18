@@ -9,15 +9,21 @@ pref-input = Input
 pref-help = { $name } v{ $version } ({ $time })
 
 # Preferences - Sections
-pref-section-ai-service = AI Service Configuration
+pref-section-chat = Chat Model
+pref-section-chat-desc = Required. Configure the AI chat service for Q&A, summaries, analysis, and all other features.
+pref-section-embedding = Embedding Model
+pref-section-embedding-desc = Optional. Enables semantic search (RAG) for better long-document Q&A. All features work without it.
 pref-section-features = Feature Settings
 pref-section-annotations = Annotation Settings
 
-# Preferences - AI Service
+# Preferences - Chat LLM
 pref-llm-provider = LLM Provider
 pref-api-base-url = API Base URL
 pref-api-key = API Key
 pref-model-name = Chat Model
+
+# Preferences - Embedding
+pref-embedding-enabled = Enable Embedding (vector search)
 pref-embedding-model = Embedding Model
 
 # Preferences - Features
@@ -64,3 +70,11 @@ skill-guide-desc = Reading suggestions, discussion questions, and study topics
 
 # Reader toolbar
 reader-toolbar-ai-btn = AI Assistant
+
+# Setup guide (shown in panel when not configured)
+setup-welcome = Welcome to AI Reading Assistant
+setup-step1 = Choose an AI provider (Ollama / DeepSeek / OpenAI, etc.)
+setup-step2 = Enter the API URL and model name
+setup-open-settings = Open Settings
+setup-chat-error = Chat model connection failed
+setup-retry = Retry

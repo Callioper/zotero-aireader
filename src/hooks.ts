@@ -219,7 +219,6 @@ function toolbarHandler(event: any) {
   btn.style.cssText = "display: flex; align-items: center; gap: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px; border: none; background: transparent; color: inherit; border-radius: 4px;";
   btn.title = "AI Assistant";
 
-  // Icon + label
   const icon = doc.createElement("span");
   icon.textContent = "\u{1F916}";
   icon.style.fontSize = "14px";
@@ -230,7 +229,6 @@ function toolbarHandler(event: any) {
   label.style.fontWeight = "500";
   btn.appendChild(label);
 
-  // Hover effect
   btn.addEventListener("mouseenter", () => {
     btn.style.background = "var(--fill-quinary, rgba(0,0,0,0.06))";
   });
@@ -238,22 +236,15 @@ function toolbarHandler(event: any) {
     btn.style.background = "transparent";
   });
 
-  // Click: toggle the AI panel section in the side pane
+  // Click: toggle the item pane visibility via the MAIN window (not reader iframe)
   btn.addEventListener("click", () => {
     Zotero.debug("AI Reader: toolbar AI button clicked");
-    // Toggle the right sidebar panel by dispatching a tab select event
-    // The AI panel is registered as a section, so we try to make it visible
     try {
-      const tabID = Zotero.Reader.getByTabID?.(
-        (Zotero_Tabs as any)?.selectedID
-      );
-      if (tabID) {
-        Zotero.debug("AI Reader: found reader tab, toggling panel");
-      }
-      // Use ZoteroPane to toggle the item pane
-      const itemPane = doc.defaultView?.document?.getElementById("zotero-item-pane");
+      const mainWin = Zotero.getMainWindow();
+      if (!mainWin) return;
+
+      const itemPane = mainWin.document.getElementById("zotero-item-pane");
       if (itemPane) {
-        // If the item pane is collapsed, expand it
         if (itemPane.getAttribute("collapsed") === "true") {
           itemPane.setAttribute("collapsed", "false");
         }
@@ -305,23 +296,31 @@ function unregisterReaderListeners() {
   Zotero.debug("AI Reader: reader event listeners unregistered");
 }
 
-// ─── Feature Handlers ────────────────────────────────────────
-
 // ─── Feature Handlers (menu commands) ────────────────────────
 
 async function onAIChat() {
   Zotero.debug("AI Reader: AI Chat menu triggered");
-  // The AI panel is already visible in the item pane via registerSection
+  // Ensure the item pane is visible so the AI panel section is accessible
+  try {
+    const mainWin = Zotero.getMainWindow();
+    if (!mainWin) return;
+    const itemPane = mainWin.document.getElementById("zotero-item-pane");
+    if (itemPane && itemPane.getAttribute("collapsed") === "true") {
+      itemPane.setAttribute("collapsed", "false");
+    }
+  } catch (e) {
+    Zotero.debug("AI Reader: onAIChat error: " + e);
+  }
 }
 
 async function onSummarize() {
   Zotero.debug("AI Reader: Summarize menu triggered");
-  // TODO: programmatically activate summary skill in the AI panel
+  // Open item pane, then the panel's skill click will be handled by the user
+  await onAIChat();
 }
 
 async function onSearch() {
-  Zotero.debug("AI Reader: Search menu triggered");
-  // TODO: implement search UI
+  Zotero.debug("AI Reader: Search menu triggered — feature in development");
 }
 
 export default {

@@ -5,12 +5,14 @@
  * 1. Text chunking (split PDF text into overlapping chunks)
  * 2. Embedding via LLM API (OpenAI/Ollama embedding endpoints)
  * 3. In-memory vector store with cosine similarity search
- * 4. Context building for LLM prompts
+ * 4. BM25 keyword fallback when embeddings are unavailable
+ * 5. Context building for LLM prompts
  *
- * No external database or Python backend required.
+ * Key design: embedding failures never block the user. If a batch fails,
+ * it is skipped and the engine falls back to BM25 for those chunks.
  */
 
-import { llmEmbed } from "./llm-client";
+import { llmEmbed, LLMEmbedOptions } from "./llm-client";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -22,7 +24,7 @@ interface TextChunk {
 }
 
 interface IndexedChunk extends TextChunk {
-  embedding: number[];
+  embedding: number[] | null; // null = embedding failed for this chunk
 }
 
 interface SearchResult {
@@ -36,6 +38,8 @@ interface DocumentIndex {
   chunks: IndexedChunk[];
   fullText: string;
   indexed: boolean;
+  /** True if at least some chunks have embeddings */
+  hasEmbeddings: boolean;
 }
 
 // ─── Configuration ──────────────────────────────────────────
@@ -43,6 +47,7 @@ interface DocumentIndex {
 const CHUNK_SIZE = 500;        // characters per chunk
 const CHUNK_OVERLAP = 100;     // overlap between chunks
 const EMBED_BATCH_SIZE = 20;   // chunks per embedding API call
+const INDEX_TOTAL_TIMEOUT = 90_000; // 90s max for entire indexing
 
 // ─── RAG Engine ─────────────────────────────────────────────
 
@@ -52,6 +57,9 @@ class RAGEngine {
   /**
    * Index a document's text for RAG search.
    * Chunks the text and computes embeddings via the configured API.
+   *
+   * Batch failures are tolerated — failed batches get null embeddings
+   * and the engine falls back to BM25 for search.
    */
   async indexDocument(itemId: number, fullText: string): Promise<void> {
     if (this.indices.has(itemId)) {
@@ -68,9 +76,22 @@ class RAGEngine {
     const chunks = chunkText(fullText, CHUNK_SIZE, CHUNK_OVERLAP);
     Zotero.debug(`AI Reader RAG: created ${chunks.length} chunks`);
 
-    // Step 2: Compute embeddings in batches
+    // Step 2: Compute embeddings in batches with per-batch error tolerance
     const indexedChunks: IndexedChunk[] = [];
+    let embeddedCount = 0;
+    const startTime = Date.now();
+
     for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
+      // Check total timeout
+      if (Date.now() - startTime > INDEX_TOTAL_TIMEOUT) {
+        Zotero.debug(`AI Reader RAG: indexing timeout after ${i} chunks, remaining will use BM25`);
+        // Push remaining chunks without embeddings
+        for (let j = i; j < chunks.length; j++) {
+          indexedChunks.push({ ...chunks[j], embedding: null });
+        }
+        break;
+      }
+
       const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
       const texts = batch.map((c) => c.text);
 
@@ -79,17 +100,15 @@ class RAGEngine {
         for (let j = 0; j < batch.length; j++) {
           indexedChunks.push({
             ...batch[j],
-            embedding: embeddings[j],
+            embedding: embeddings[j] || null,
           });
+          if (embeddings[j]) embeddedCount++;
         }
       } catch (e) {
-        Zotero.debug(`AI Reader RAG: embedding batch ${i} failed: ${e}`);
-        // Fall back: store chunks without embeddings (will use keyword search)
+        // Batch failed — push chunks with null embeddings, continue
+        Zotero.debug(`AI Reader RAG: batch ${i}-${i + batch.length} embedding failed: ${e}`);
         for (const chunk of batch) {
-          indexedChunks.push({
-            ...chunk,
-            embedding: [],
-          });
+          indexedChunks.push({ ...chunk, embedding: null });
         }
       }
     }
@@ -99,104 +118,72 @@ class RAGEngine {
       chunks: indexedChunks,
       fullText,
       indexed: true,
+      hasEmbeddings: embeddedCount > 0,
     });
 
-    const embeddedCount = indexedChunks.filter((c) => c.embedding.length > 0).length;
-    Zotero.debug(`AI Reader RAG: indexed ${indexedChunks.length} chunks (${embeddedCount} with embeddings)`);
+    Zotero.debug(`AI Reader RAG: indexed ${indexedChunks.length} chunks, ${embeddedCount} with embeddings`);
   }
 
   /**
-   * Search for relevant chunks using the query.
-   * Uses embedding-based cosine similarity when available,
-   * falls back to keyword matching otherwise.
+   * Non-blocking indexing — fires and forgets.
+   * Returns immediately; indexing runs in background.
+   * Use `isIndexed()` to check completion.
+   */
+  indexDocumentAsync(itemId: number, fullText: string): void {
+    this.indexDocument(itemId, fullText).catch((e) => {
+      Zotero.debug(`AI Reader RAG: async indexing failed for ${itemId}: ${e}`);
+    });
+  }
+
+  /**
+   * Search for relevant chunks using vector similarity or BM25 fallback.
    */
   async search(itemId: number, query: string, topK: number = 5): Promise<SearchResult[]> {
     const index = this.indices.get(itemId);
-    if (!index || !index.indexed) {
-      Zotero.debug(`AI Reader RAG: no index for item ${itemId}`);
-      return [];
+    if (!index || !index.indexed) return [];
+
+    // Try vector search first if we have embeddings
+    if (index.hasEmbeddings) {
+      try {
+        const queryEmbedding = await llmEmbed([query]);
+        if (queryEmbedding[0]) {
+          return vectorSearch(index.chunks, queryEmbedding[0], topK);
+        }
+      } catch (e) {
+        Zotero.debug(`AI Reader RAG: query embedding failed, falling back to BM25: ${e}`);
+      }
     }
 
-    const hasEmbeddings = index.chunks.some((c) => c.embedding.length > 0);
-
-    if (hasEmbeddings) {
-      return await this.embeddingSearch(index, query, topK);
-    }
-
-    // Fallback: keyword-based search
-    return this.keywordSearch(index, query, topK);
+    // BM25 keyword fallback
+    return bm25Search(index.chunks, query, topK);
   }
 
   /**
-   * Build a context string from search results for inclusion in LLM prompts.
+   * Build a context string from search results for LLM prompts.
    */
   buildContext(results: SearchResult[]): string {
     if (results.length === 0) return "";
 
-    const parts = results.map((r, i) => {
-      return `[${i + 1}] (相关度: ${(r.score * 100).toFixed(0)}%) ${r.chunk.text}`;
-    });
+    const contextParts = results.map((r, i) =>
+      `[${i + 1}] (相关度: ${(r.score * 100).toFixed(0)}%)\n${r.chunk.text}`,
+    );
 
-    return "参考材料:\n\n" + parts.join("\n\n");
+    return `参考材料:\n${contextParts.join("\n\n")}`;
   }
 
-  /**
-   * Check if a document is already indexed.
-   */
+  /** Check if a document has been indexed */
   isIndexed(itemId: number): boolean {
     return this.indices.get(itemId)?.indexed === true;
   }
 
-  /**
-   * Clear the index for a document.
-   */
-  clearIndex(itemId: number) {
+  /** Check if a document has vector embeddings (not just BM25) */
+  hasEmbeddings(itemId: number): boolean {
+    return this.indices.get(itemId)?.hasEmbeddings === true;
+  }
+
+  /** Clear index for a specific document */
+  clearIndex(itemId: number): void {
     this.indices.delete(itemId);
-  }
-
-  /**
-   * Clear all indices.
-   */
-  clearAll() {
-    this.indices.clear();
-  }
-
-  // ─── Private Search Methods ─────────────────────────────
-
-  private async embeddingSearch(index: DocumentIndex, query: string, topK: number): Promise<SearchResult[]> {
-    try {
-      const [queryEmbedding] = await llmEmbed([query]);
-
-      const scored = index.chunks
-        .filter((c) => c.embedding.length > 0)
-        .map((chunk) => ({
-          chunk,
-          score: cosineSimilarity(queryEmbedding, chunk.embedding),
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, topK);
-
-      return scored;
-    } catch (e) {
-      Zotero.debug(`AI Reader RAG: embedding search failed, falling back to keywords: ${e}`);
-      return this.keywordSearch(index, query, topK);
-    }
-  }
-
-  private keywordSearch(index: DocumentIndex, query: string, topK: number): SearchResult[] {
-    // Simple BM25-like keyword scoring
-    const queryTerms = tokenize(query);
-
-    const scored = index.chunks.map((chunk) => {
-      const chunkTerms = tokenize(chunk.text);
-      const score = bm25Score(queryTerms, chunkTerms, index.chunks.length);
-      return { chunk, score };
-    });
-
-    return scored
-      .filter((r) => r.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, topK);
   }
 }
 
@@ -204,73 +191,76 @@ class RAGEngine {
 
 function chunkText(text: string, chunkSize: number, overlap: number): TextChunk[] {
   const chunks: TextChunk[] = [];
-  const totalLen = text.length;
-
-  // Estimate pages: assume ~3000 chars per page
-  const charsPerPage = 3000;
-
   let start = 0;
   let index = 0;
 
-  while (start < totalLen) {
-    let end = Math.min(start + chunkSize, totalLen);
+  // Rough page estimation: ~3000 chars per page
+  const charsPerPage = 3000;
 
-    // Try to break at sentence boundary
-    if (end < totalLen) {
-      const breakPoints = [
-        text.lastIndexOf("。", end),
-        text.lastIndexOf(". ", end),
-        text.lastIndexOf(".\n", end),
-        text.lastIndexOf("\n\n", end),
-        text.lastIndexOf("\n", end),
-      ];
+  while (start < text.length) {
+    const end = Math.min(start + chunkSize, text.length);
+    const chunkText = text.substring(start, end);
 
-      for (const bp of breakPoints) {
-        if (bp > start + chunkSize * 0.5) {
-          end = bp + 1;
-          break;
-        }
-      }
-    }
+    chunks.push({
+      text: chunkText,
+      index,
+      pageEstimate: Math.floor(start / charsPerPage),
+    });
 
-    const chunkText = text.substring(start, end).trim();
-    if (chunkText.length > 20) {
-      chunks.push({
-        text: chunkText,
-        index,
-        pageEstimate: Math.floor(start / charsPerPage),
-      });
-      index++;
-    }
-
-    start = end - overlap;
-    if (start >= totalLen) break;
+    start += chunkSize - overlap;
+    index++;
   }
 
   return chunks;
 }
 
-// ─── Math Utilities ─────────────────────────────────────────
+// ─── Vector Search ──────────────────────────────────────────
+
+function vectorSearch(chunks: IndexedChunk[], queryEmbedding: number[], topK: number): SearchResult[] {
+  const scored: SearchResult[] = [];
+
+  for (const chunk of chunks) {
+    if (!chunk.embedding) continue;
+    const score = cosineSimilarity(queryEmbedding, chunk.embedding);
+    scored.push({ chunk, score });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, topK);
+}
 
 function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length || a.length === 0) return 0;
-
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-
+  if (a.length !== b.length) return 0;
+  let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
+    dot += a[i] * b[i];
     normA += a[i] * a[i];
     normB += b[i] * b[i];
   }
-
   const denom = Math.sqrt(normA) * Math.sqrt(normB);
-  if (denom === 0) return 0;
-  return dotProduct / denom;
+  return denom === 0 ? 0 : dot / denom;
 }
 
 // ─── BM25 Keyword Search ────────────────────────────────────
+
+function bm25Search(chunks: IndexedChunk[], query: string, topK: number): SearchResult[] {
+  const queryTerms = tokenize(query);
+  if (queryTerms.length === 0) return [];
+
+  const scored: SearchResult[] = [];
+  const totalDocs = chunks.length;
+
+  for (const chunk of chunks) {
+    const docTerms = tokenize(chunk.text);
+    const score = bm25Score(queryTerms, docTerms, totalDocs);
+    if (score > 0) {
+      scored.push({ chunk, score });
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, topK);
+}
 
 function tokenize(text: string): string[] {
   return text
