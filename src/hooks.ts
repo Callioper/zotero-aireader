@@ -42,6 +42,10 @@ async function onMainWindowLoad(win: Window): Promise<void> {
   });
 
   await Zotero.uiReadyPromise;
+
+  // Load localization
+  win.MozXULElement.insertFTLIfNeeded(`chrome://${config.addonRef}/content/locale/${Zotero.locale}/addon.ftl`);
+
   injectStyle(win);
 }
 
@@ -115,8 +119,18 @@ function registerMenu() {
     menus: [
       {
         menuType: "menuitem",
-        label: "Test Item",
-        onCommand: () => Zotero.debug("Test clicked"),
+        l10nID: "zotero-air-reader-menu-ai-chat",
+        onCommand: () => onAIChat(),
+      },
+      {
+        menuType: "menuitem",
+        l10nID: "zotero-air-reader-menu-summarize",
+        onCommand: () => onSummarize(),
+      },
+      {
+        menuType: "menuitem",
+        l10nID: "zotero-air-reader-menu-search",
+        onCommand: () => onSearch(),
       },
     ],
   });

@@ -14,3 +14,6 @@ pref-enable = 启用 AI 阅读器
 pref-input = 输入
 pref-api-url = API 地址
 pref-help = { name } v{ version } ({ time })
+zotero-air-reader-menu-ai-chat = AI 问答
+zotero-air-reader-menu-summarize = 总结文献
+zotero-air-reader-menu-search = 语义搜索
