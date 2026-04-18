@@ -6,24 +6,25 @@ export class AIChatPanel {
   private pdfPath: string | null = null;
 
   private createPanel(): Element {
-    const vbox = document.createElement("vbox");
+    const doc = document;
+    const vbox = doc.createXULElement("vbox");
     vbox.setAttribute("flex", "1");
 
-    const title = document.createElement("label");
+    const title = doc.createXULElement("label");
     title.setAttribute("value", "AI 问答");
     title.setAttribute("style", "font-weight: bold; font-size: 16px;");
     vbox.appendChild(title);
 
-    const messages = document.createElement("vbox");
+    const messages = doc.createXULElement("vbox");
     messages.setAttribute("flex", "1");
     messages.setAttribute("style", "overflow: auto;");
     messages.setAttribute("id", "chat-messages");
     vbox.appendChild(messages);
 
-    const inputBox = document.createElement("hbox");
+    const inputBox = doc.createXULElement("hbox");
     inputBox.setAttribute("align", "center");
 
-    const input = document.createElement("textbox");
+    const input = doc.createXULElement("textbox");
     input.setAttribute("flex", "1");
     input.setAttribute("placeholder", "输入您的问题...");
     input.setAttribute("id", "chat-input");
@@ -35,7 +36,7 @@ export class AIChatPanel {
     });
     inputBox.appendChild(input);
 
-    const button = document.createElement("button");
+    const button = doc.createXULElement("button");
     button.setAttribute("label", "发送");
     button.addEventListener("click", () => this.sendQuestion());
     inputBox.appendChild(button);
@@ -126,26 +127,27 @@ export class AIChatPanel {
   }
 
   private displayResponse(response: ChatResponse) {
-    const messagesContainer = document.getElementById("chat-messages");
+    const doc = document;
+    const messagesContainer = doc.getElementById("chat-messages");
     if (!messagesContainer) return;
 
-    const answerBox = document.createElement("vbox");
+    const answerBox = doc.createXULElement("vbox");
     answerBox.setAttribute("style", "margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 5px;");
 
-    const answerLabel = document.createElement("label");
+    const answerLabel = doc.createXULElement("label");
     answerLabel.setAttribute("value", `AI 回答: ${response.answer}`);
     answerLabel.setAttribute("style", "color: #333;");
     answerBox.appendChild(answerLabel);
 
     if (response.citations.length > 0) {
-      const citationsLabel = document.createElement("label");
+      const citationsLabel = doc.createXULElement("label");
       citationsLabel.setAttribute("value", "参考来源:");
       citationsLabel.setAttribute("style", "font-weight: bold; margin-top: 5px;");
       answerBox.appendChild(citationsLabel);
 
       response.citations.forEach((c) => {
         const citationText = `【${c.index}】${c.chapter_title}: ${c.quoted_text}`;
-        const citationLabel = document.createElement("label");
+        const citationLabel = doc.createXULElement("label");
         citationLabel.setAttribute("value", citationText);
         citationLabel.setAttribute("style", "font-size: 12px; color: #666; margin-left: 10px;");
         answerBox.appendChild(citationLabel);
@@ -156,7 +158,8 @@ export class AIChatPanel {
   }
 
   private showMessage(text: string, type: "user" | "info" | "error" | "success") {
-    const messagesContainer = document.getElementById("chat-messages");
+    const doc = document;
+    const messagesContainer = doc.getElementById("chat-messages");
     if (!messagesContainer) return;
 
     const colors: Record<string, string> = {
@@ -166,7 +169,7 @@ export class AIChatPanel {
       success: "#388e3c",
     };
 
-    const msgLabel = document.createElement("label");
+    const msgLabel = doc.createXULElement("label");
     msgLabel.setAttribute("value", text);
     msgLabel.setAttribute("style", `color: ${colors[type] || colors.info}; margin: 5px 0;`);
 
