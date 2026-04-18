@@ -14,6 +14,13 @@ async function onStartup() {
   registerPrefs();
   registerStyle();
 
+  const windows = Zotero.getMainWindows();
+  Zotero.debug("AI Reader: main windows count:", windows.length);
+  for (const win of windows) {
+    Zotero.debug("AI Reader: processing window:", win.location?.href);
+    registerMenu(win);
+  }
+
   Zotero[config.addonInstance].data.initialized = true;
 }
 
