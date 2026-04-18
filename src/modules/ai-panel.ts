@@ -374,9 +374,10 @@ class AIPanel {
     container.appendChild(inputArea);
     body.appendChild(container);
 
-    requestAnimationFrame(() => {
+    // Use setTimeout instead of requestAnimationFrame (not available in Zotero privileged context)
+    setTimeout(() => {
       messages.scrollTop = messages.scrollHeight;
-    });
+    }, 0);
   }
 
   private createMessageElement(doc: Document, role: string, content: string): HTMLElement {
