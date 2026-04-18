@@ -116,7 +116,7 @@ function onPrefsEvent(event: string, data: { window: Window }) {
 
 function registerMenu() {
   Zotero.debug("AI Reader: registerMenu called");
-  // Use hardcoded English labels for now - localization will be fixed later
+
   Zotero.MenuManager.registerMenu({
     menuID: "air-reader-menu",
     pluginID: config.addonID,
@@ -124,17 +124,17 @@ function registerMenu() {
     menus: [
       {
         menuType: "menuitem",
-        label: "AI Chat",
+        id: "air-reader-ai-chat",
         onCommand: () => onAIChat(),
       },
       {
         menuType: "menuitem",
-        label: "Summarize",
+        id: "air-reader-summarize",
         onCommand: () => onSummarize(),
       },
       {
         menuType: "menuitem",
-        label: "Semantic Search",
+        id: "air-reader-search",
         onCommand: () => onSearch(),
       },
     ],
