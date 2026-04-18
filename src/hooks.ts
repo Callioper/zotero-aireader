@@ -111,7 +111,7 @@ function onPrefsEvent(event: string, data: { window: Window }) {
 
 function registerMenu() {
   Zotero.debug("AI Reader: registerMenu called");
-  // Minimal test - just a separator
+  // Test: just a separator (no menuitem at all)
   Zotero.MenuManager.registerMenu({
     menuID: "zotero-air-reader-menu",
     pluginID: config.addonID,
