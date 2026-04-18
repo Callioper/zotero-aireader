@@ -12,7 +12,7 @@
   "applications": {
 "zotero": {
       "id": "zotero-ai-reader@callioper",
-      "update_url": "https://github.com/Callioper/zotero-aireader/releases/download/v1.0.0/update.json",
+      "update_url": "https://github.com/Callioper/zotero-aireader/releases/download/v1.2.0/update.json",
       "strict_min_version": "6.999",
       "strict_max_version": "9.*"
     }
