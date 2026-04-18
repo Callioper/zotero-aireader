@@ -27,7 +27,7 @@ function onShutdown() {
 
 async function onMainWindowLoad(win: Window): Promise<void> {
   Zotero.debug("AI Reader: onMainWindowLoad called, window type:", typeof win);
-  Zotero.debug("AI Reader: win.document element:", win.document ? "exists" : "null");
+  Zotero.debug("AIReader: win.document element:", win.document ? "exists" : "null");
 
   await new Promise((resolve) => {
     if (win.document.readyState !== "complete") {
@@ -43,7 +43,6 @@ async function onMainWindowLoad(win: Window): Promise<void> {
 
   await Zotero.uiReadyPromise;
   injectStyle(win);
-  registerMenu(win);
 }
 
 function injectStyle(win: Window) {
@@ -159,24 +158,29 @@ function alert(win: Window, title: string, msg: string) {
   prom.show();
 }
 
+function getMainWindow(): Window {
+  return Zotero.getMainWindow();
+}
+
 async function onAIChat() {
+  const win = getMainWindow();
   const items = ZoteroPane.getSelectedItems();
   if (!items.length) {
-    alert(window, "提示", "请先选择一个文献条目");
+    alert(win, "提示", "请先选择一个文献条目");
     return;
   }
 
   const item = items[0];
   const attachments = item.attachments;
   if (!attachments || attachments.length === 0) {
-    alert(window, "提示", "请选择一个包含 PDF 附件的文献条目");
+    alert(win, "提示", "请选择一个包含 PDF 附件的文献条目");
     return;
   }
 
   const attachment = attachments[0];
   const pdfPath = attachment.filePath;
   if (!pdfPath) {
-    alert(window, "提示", "无法获取 PDF 文件路径");
+    alert(win, "提示", "无法获取 PDF 文件路径");
     return;
   }
 
@@ -184,34 +188,35 @@ async function onAIChat() {
 }
 
 async function onSummarize() {
+  const win = getMainWindow();
   const items = ZoteroPane.getSelectedItems();
   if (!items.length) {
-    alert(window, "提示", "请先选择一个文献条目");
+    alert(win, "提示", "请先选择一个文献条目");
     return;
   }
 
   const item = items[0];
   const attachments = item.attachments;
   if (!attachments || attachments.length === 0) {
-    alert(window, "提示", "请选择一个包含 PDF 附件的文献条目");
+    alert(win, "提示", "请选择一个包含 PDF 附件的文献条目");
     return;
   }
 
   const attachment = attachments[0];
   const pdfPath = attachment.filePath;
   if (!pdfPath) {
-    alert(window, "提示", "无法获取 PDF 文件路径");
+    alert(win, "提示", "无法获取 PDF 文件路径");
     return;
   }
 
   try {
     const health = await apiClient.health();
     if (health.status !== "ok") {
-      alert(window, "提示", "后端服务未运行，请先启动服务");
+      alert(win, "提示", "后端服务未运行，请先启动服务");
       return;
     }
 
-    alert(window, "提示", "正在生成总结，请稍候...");
+    alert(win, "提示", "正在生成总结，请稍候...");
 
     await apiClient.indexItem(item.id, pdfPath);
     const response = await apiClient.chat({
@@ -220,14 +225,15 @@ async function onSummarize() {
       use_rag: true,
     });
 
-    alert(window, "文献总结", response.answer);
+    alert(win, "文献总结", response.answer);
   } catch (error) {
-    alert(window, "错误", `总结失败: ${error}`);
+    alert(win, "错误", `总结失败: ${error}`);
   }
 }
 
 async function onSearch() {
-  const result = window.prompt("语义搜索", "输入搜索内容:");
+  const win = getMainWindow();
+  const result = win.prompt("语义搜索", "输入搜索内容:");
   if (!result) return;
 
   try {
@@ -237,7 +243,7 @@ async function onSearch() {
     const response = await apiClient.search(result, itemId, 10);
 
     if (response.results.length === 0) {
-      alert(window, "提示", "未找到相关结果");
+      alert(win, "提示", "未找到相关结果");
       return;
     }
 
@@ -246,9 +252,9 @@ async function onSearch() {
       message += `【${i + 1}】${r.chapter_title}\n${r.content}\n\n`;
     });
 
-    alert(window, "搜索结果", message);
+    alert(win, "搜索结果", message);
   } catch (error) {
-    alert(window, "错误", `搜索失败: ${error}`);
+    alert(win, "错误", `搜索失败: ${error}`);
   }
 }
 
