@@ -44,7 +44,7 @@ async function onMainWindowLoad(win: Window): Promise<void> {
   await Zotero.uiReadyPromise;
 
   // Load localization
-  win.MozXULElement.insertFTLIfNeeded(`chrome://${config.addonRef}/content/locale/${Zotero.locale}/addon.ftl`);
+  win.document.l10n?.addResourceIds([`${config.addonRef}-addon.ftl`]);
 
   injectStyle(win);
 }
