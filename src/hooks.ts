@@ -25,7 +25,8 @@ function onShutdown() {
 }
 
 async function onMainWindowLoad(win: Window): Promise<void> {
-  Zotero.debug("AI Reader: onMainWindowLoad called");
+  Zotero.debug("AI Reader: onMainWindowLoad called, window type:", typeof win);
+  Zotero.debug("AI Reader: win.document element:", win.document ? "exists" : "null");
 
   await new Promise((resolve) => {
     if (win.document.readyState !== "complete") {
@@ -105,35 +106,48 @@ function onPrefsEvent(event: string, data: { window: Window }) {
 }
 
 function registerMenu(win: Window) {
-  const menuPopup = win.document.getElementById("zotero-itemmenu");
-  if (!menuPopup) {
-    Zotero.debug("AI Reader ERROR: zotero-itemmenu not found");
-    return;
+  Zotero.debug("AI Reader: registerMenu called");
+
+  function tryRegister() {
+    const menuPopup = win.document.getElementById("zotero-itemmenu");
+    if (!menuPopup) {
+      Zotero.debug("AI Reader ERROR: zotero-itemmenu not found, retrying...");
+      return false;
+    }
+    Zotero.debug("AI Reader: found zotero-itemmenu");
+
+    const submenu = win.document.createElement("menu");
+    submenu.setAttribute("id", "zotero-air-reader-menu");
+    submenu.setAttribute("label", "AI Reader");
+
+    const menupopup = win.document.createElement("menupopup");
+
+    const menuItems = [
+      { label: "AI 问答", command: () => onAIChat() },
+      { label: "总结文献", command: () => onSummarize() },
+      { label: "语义搜索", command: () => onSearch() },
+    ];
+
+    for (const item of menuItems) {
+      const menuitem = win.document.createElement("menuitem");
+      menuitem.setAttribute("label", item.label);
+      menuitem.addEventListener("command", item.command);
+      menupopup.appendChild(menuitem);
+    }
+
+    submenu.appendChild(menupopup);
+    menuPopup.appendChild(submenu);
+    Zotero.debug("AI Reader: menu items added");
+    return true;
   }
-  Zotero.debug("AI Reader: found zotero-itemmenu");
 
-  const submenu = win.document.createElement("menu");
-  submenu.setAttribute("id", "zotero-air-reader-menu");
-  submenu.setAttribute("label", "AI Reader");
-
-  const menupopup = win.document.createElement("menupopup");
-
-  const menuItems = [
-    { label: "AI 问答", command: () => onAIChat() },
-    { label: "总结文献", command: () => onSummarize() },
-    { label: "语义搜索", command: () => onSearch() },
-  ];
-
-  for (const item of menuItems) {
-    const menuitem = win.document.createElement("menuitem");
-    menuitem.setAttribute("label", item.label);
-    menuitem.addEventListener("command", item.command);
-    menupopup.appendChild(menuitem);
+  if (!tryRegister()) {
+    setTimeout(() => {
+      if (tryRegister()) {
+        Zotero.debug("AI Reader: menu registered after retry");
+      }
+    }, 1000);
   }
-
-  submenu.appendChild(menupopup);
-  menuPopup.appendChild(submenu);
-  Zotero.debug("AI Reader: menu items added");
 }
 
 function alert(win: Window, title: string, msg: string) {
