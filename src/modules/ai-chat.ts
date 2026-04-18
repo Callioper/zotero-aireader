@@ -46,6 +46,7 @@ export class AIChatPanel {
   }
 
   open(itemId: number, pdfPath: string) {
+    if (typeof document === "undefined") return;
     this.itemId = itemId;
     this.pdfPath = pdfPath;
 
@@ -173,6 +174,7 @@ export class AIChatPanel {
   }
 
   close() {
+    if (typeof document === "undefined") return;
     const panel = document.getElementById("zotero-air-chat-panel");
     if (panel) {
       panel.remove();
