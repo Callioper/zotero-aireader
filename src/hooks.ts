@@ -118,7 +118,7 @@ function registerMenu() {
   Zotero.debug("AI Reader: registerMenu called");
   // Use hardcoded English labels for now - localization will be fixed later
   Zotero.MenuManager.registerMenu({
-    menuID: "zotero-air-reader-menu",
+    menuID: "air-reader-menu",
     pluginID: config.addonID,
     target: "main/library/item",
     menus: [
