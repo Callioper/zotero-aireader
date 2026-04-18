@@ -13,6 +13,7 @@ async function onStartup() {
   registerNotifier();
   registerPrefs();
   registerStyle();
+  registerMenu();
 
   Zotero[config.addonInstance].data.initialized = true;
 }
@@ -105,49 +106,48 @@ function onPrefsEvent(event: string, data: { window: Window }) {
   }
 }
 
-function registerMenu(win: Window) {
+function registerMenu() {
   Zotero.debug("AI Reader: registerMenu called");
 
-  function tryRegister() {
-    const menuPopup = win.document.getElementById("zotero-itemmenu");
-    if (!menuPopup) {
-      Zotero.debug("AI Reader ERROR: zotero-itemmenu not found, retrying...");
-      return false;
-    }
-    Zotero.debug("AI Reader: found zotero-itemmenu");
+  Zotero.MenuManager.registerMenu({
+    menuType: "menu",
+    target: "main/library/item",
+    label: "AI Reader",
+    onCommand: () => {
+      // Menu was clicked - submenu items handled separately
+    },
+    menuID: "zotero-air-reader-menu",
+    pluginID: config.addonID,
+  });
 
-    const submenu = win.document.createXULElement("menu");
-    submenu.setAttribute("id", "zotero-air-reader-menu");
-    submenu.setAttribute("label", "AI Reader");
+  Zotero.MenuManager.registerMenu({
+    menuType: "menuitem",
+    target: "main/library/item",
+    label: "AI 问答",
+    onCommand: () => onAIChat(),
+    menuID: "zotero-air-reader-ai-chat",
+    pluginID: config.addonID,
+  });
 
-    const menupopup = win.document.createXULElement("menupopup");
+  Zotero.MenuManager.registerMenu({
+    menuType: "menuitem",
+    target: "main/library/item",
+    label: "总结文献",
+    onCommand: () => onSummarize(),
+    menuID: "zotero-air-reader-summarize",
+    pluginID: config.addonID,
+  });
 
-    const menuItems = [
-      { label: "AI 问答", command: () => onAIChat() },
-      { label: "总结文献", command: () => onSummarize() },
-      { label: "语义搜索", command: () => onSearch() },
-    ];
+  Zotero.MenuManager.registerMenu({
+    menuType: "menuitem",
+    target: "main/library/item",
+    label: "语义搜索",
+    onCommand: () => onSearch(),
+    menuID: "zotero-air-reader-search",
+    pluginID: config.addonID,
+  });
 
-    for (const item of menuItems) {
-      const menuitem = win.document.createXULElement("menuitem");
-      menuitem.setAttribute("label", item.label);
-      menuitem.addEventListener("command", item.command);
-      menupopup.appendChild(menuitem);
-    }
-
-    submenu.appendChild(menupopup);
-    menuPopup.appendChild(submenu);
-    Zotero.debug("AI Reader: menu items added");
-    return true;
-  }
-
-  if (!tryRegister()) {
-    setTimeout(() => {
-      if (tryRegister()) {
-        Zotero.debug("AI Reader: menu registered after retry");
-      }
-    }, 1000);
-  }
+  Zotero.debug("AI Reader: menu items registered");
 }
 
 function alert(win: Window, title: string, msg: string) {
