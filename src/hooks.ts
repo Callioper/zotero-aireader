@@ -117,25 +117,16 @@ function onPrefsEvent(event: string, data: { window: Window }) {
 function registerMenu() {
   Zotero.debug("AI Reader: registerMenu called");
 
+  // Single menu item test
   Zotero.MenuManager.registerMenu({
-    menuID: "air-reader-menu",
+    menuID: "air-reader-item",
     pluginID: config.addonID,
     target: "main/library/item",
     menus: [
       {
         menuType: "menuitem",
-        id: "air-reader-ai-chat",
-        onCommand: () => onAIChat(),
-      },
-      {
-        menuType: "menuitem",
-        id: "air-reader-summarize",
-        onCommand: () => onSummarize(),
-      },
-      {
-        menuType: "menuitem",
-        id: "air-reader-search",
-        onCommand: () => onSearch(),
+        label: "Test",
+        onCommand: () => Zotero.debug("Test clicked"),
       },
     ],
   });
