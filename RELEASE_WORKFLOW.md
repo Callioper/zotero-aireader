@@ -32,6 +32,20 @@ git --version
 - 检查 Error Console 是否有错误
 - 确认右键菜单、面板、设置都正常工作
 
+**CRITICAL: 运行预发布验证脚本**
+```powershell
+.\scripts\validate-release.ps1
+```
+
+此脚本会检查：
+- FTL 文件是否存在且完整
+- preferences.xhtml 中的 l10n-id 是否有正确前缀
+- bootstrap.js 中的 locale 注册
+- hooks.ts 中的 FTL 加载方式
+- 构建产物是否正确
+
+**如果验证失败，必须修复后才能发布！**
+
 ### 3. 构建插件
 
 ```bash
