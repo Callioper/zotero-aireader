@@ -32,6 +32,8 @@ interface SearchResult {
   score: number;
 }
 
+export type IndexingProgressCallback = (progress: number, status: string) => void;
+
 /** In-memory index for a single document */
 interface DocumentIndex {
   itemId: number;
@@ -60,39 +62,47 @@ class RAGEngine {
    *
    * Batch failures are tolerated — failed batches get null embeddings
    * and the engine falls back to BM25 for search.
+   *
+   * @param onProgress - Optional callback(percent: number, status: string) for progress updates
    */
-  async indexDocument(itemId: number, fullText: string): Promise<void> {
+  async indexDocument(itemId: number, fullText: string, onProgress?: IndexingProgressCallback): Promise<void> {
     if (this.indices.has(itemId)) {
       const existing = this.indices.get(itemId)!;
       if (existing.indexed) {
         Zotero.debug(`AI Reader RAG: document ${itemId} already indexed`);
+        onProgress?.(100, "Indexed");
         return;
       }
     }
 
     Zotero.debug(`AI Reader RAG: indexing document ${itemId} (${fullText.length} chars)`);
+    onProgress?.(0, "Chunking...");
 
     // Step 1: Chunk the text
     const chunks = chunkText(fullText, CHUNK_SIZE, CHUNK_OVERLAP);
     Zotero.debug(`AI Reader RAG: created ${chunks.length} chunks`);
+    onProgress?.(10, `Created ${chunks.length} chunks`);
 
     // Step 2: Compute embeddings in batches with per-batch error tolerance
     const indexedChunks: IndexedChunk[] = [];
     let embeddedCount = 0;
     const startTime = Date.now();
+    const totalBatches = Math.ceil(chunks.length / EMBED_BATCH_SIZE);
 
-    for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
+    for (let batchIdx = 0; batchIdx < chunks.length; batchIdx += EMBED_BATCH_SIZE) {
+      const batchStartTime = Date.now();
+
       // Check total timeout
       if (Date.now() - startTime > INDEX_TOTAL_TIMEOUT) {
-        Zotero.debug(`AI Reader RAG: indexing timeout after ${i} chunks, remaining will use BM25`);
+        Zotero.debug(`AI Reader RAG: indexing timeout after ${batchIdx} chunks, remaining will use BM25`);
         // Push remaining chunks without embeddings
-        for (let j = i; j < chunks.length; j++) {
+        for (let j = batchIdx; j < chunks.length; j++) {
           indexedChunks.push({ ...chunks[j], embedding: null });
         }
         break;
       }
 
-      const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
+      const batch = chunks.slice(batchIdx, batchIdx + EMBED_BATCH_SIZE);
       const texts = batch.map((c) => c.text);
 
       try {
@@ -106,11 +116,18 @@ class RAGEngine {
         }
       } catch (e) {
         // Batch failed — push chunks with null embeddings, continue
-        Zotero.debug(`AI Reader RAG: batch ${i}-${i + batch.length} embedding failed: ${e}`);
+        Zotero.debug(`AI Reader RAG: batch ${batchIdx}-${batchIdx + batch.length} embedding failed: ${e}`);
         for (const chunk of batch) {
           indexedChunks.push({ ...chunk, embedding: null });
         }
       }
+
+      // Progress update
+      const currentBatch = Math.floor(batchIdx / EMBED_BATCH_SIZE) + 1;
+      const percent = Math.round((currentBatch / totalBatches) * 80) + 10; // 10-90%
+      const elapsed = Date.now() - batchStartTime;
+      const status = `Embedding batch ${currentBatch}/${totalBatches} (${elapsed}ms)`;
+      onProgress?.(percent, status);
     }
 
     this.indices.set(itemId, {
@@ -122,12 +139,22 @@ class RAGEngine {
     });
 
     Zotero.debug(`AI Reader RAG: indexed ${indexedChunks.length} chunks, ${embeddedCount} with embeddings`);
+    onProgress?.(100, `Done: ${indexedChunks.length} chunks, ${embeddedCount} embedded`);
   }
 
   /**
-   * Non-blocking indexing — fires and forgets.
+   * Non-blocking indexing with progress callback.
    * Returns immediately; indexing runs in background.
-   * Use `isIndexed()` to check completion.
+   */
+  indexDocumentWithProgress(itemId: number, fullText: string, onProgress?: IndexingProgressCallback): void {
+    this.indexDocument(itemId, fullText, onProgress).catch((e) => {
+      Zotero.debug(`AI Reader RAG: async indexing failed for ${itemId}: ${e}`);
+      onProgress?.(0, `Failed: ${e}`);
+    });
+  }
+
+  /**
+   * Legacy async indexing - fires and forgets without progress.
    */
   indexDocumentAsync(itemId: number, fullText: string): void {
     this.indexDocument(itemId, fullText).catch((e) => {

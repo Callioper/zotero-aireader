@@ -28,6 +28,7 @@ pref-embedding-provider = Embedding Provider
 pref-embedding-base-url = Embedding Server
 pref-embedding-api-key = Embedding API Key
 pref-embedding-model = Embedding Model
+pref-indexing-mode = Indexing Mode
 
 # Preferences - Features
 pref-language = Default Language

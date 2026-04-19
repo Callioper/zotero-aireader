@@ -17,6 +17,9 @@ pref("embeddingBaseUrl", "");
 pref("embeddingApiKey", "");
 pref("embeddingModel", "");
 
+// Indexing mode: "auto" or "manual"
+pref("indexingMode", "manual");
+
 // Features
 pref("language", "zh");
 pref("autoIndex", false);

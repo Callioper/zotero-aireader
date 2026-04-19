@@ -28,6 +28,7 @@ pref-embedding-provider = Embedding 提供商
 pref-embedding-base-url = Embedding 服务器
 pref-embedding-api-key = Embedding API 密钥
 pref-embedding-model = Embedding 模型
+pref-indexing-mode = 索引模式
 
 # Preferences - Features
 pref-language = 默认语言

@@ -113,7 +113,7 @@ class AIPanel {
         // Only cache full text — NO automatic API calls
         await this.cacheFullText(itemId, item);
 
-        // If embedding enabled + autoIndex, start async indexing (non-blocking)
+        // Auto-indexing: only if auto mode AND embedding enabled AND not yet indexed
         if (isAutoIndex() && !this.getConversation(itemId).indexed) {
           const conv = this.getConversation(itemId);
           if (conv.fullText && !conv.indexing) {
@@ -339,11 +339,71 @@ class AIPanel {
     }
     container.appendChild(skillsBar);
 
+    // Indexing status bar (shown when embedding is enabled)
+    const indexingBar = doc.createElement("div");
+    indexingBar.className = "air-indexing-bar";
+    indexingBar.style.cssText = "display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: #f5f5f5; border-bottom: 1px solid #e0e0e0; font-size: 12px;";
+
+    const indexStatus = doc.createElement("span");
+    indexStatus.className = "air-index-status";
+    indexStatus.style.cssText = "flex: 1; color: #666;";
+
+    const indexBtn = doc.createElement("button");
+    indexBtn.className = "air-index-btn";
+    indexBtn.style.cssText = "padding: 4px 12px; border-radius: 4px; border: 1px solid #0078d7; background: #0078d7; color: white; cursor: pointer; font-size: 11px;";
+    indexBtn.textContent = "Index";
+
+    const progressBar = doc.createElement("div");
+    progressBar.className = "air-index-progress";
+    progressBar.style.cssText = "width: 60px; height: 6px; background: #e0e0e0; border-radius: 3px; display: none;";
+    const progressFill = doc.createElement("div");
+    progressFill.style.cssText = "height: 100%; background: #0078d7; border-radius: 3px; width: 0%;";
+    progressBar.appendChild(progressFill);
+    progressBar.style.display = "none";
+
+    indexingBar.appendChild(indexStatus);
+    indexingBar.appendChild(progressBar);
+    indexingBar.appendChild(indexBtn);
+    container.appendChild(indexingBar);
+
+    // Update index status based on current state
+    const conv = this.getConversation(itemId);
+    this.updateIndexStatus(conv, itemId, indexStatus, indexBtn, progressBar, progressFill, indexingBar);
+
+    // Index button click handler
+    indexBtn.addEventListener("click", () => {
+      if (conv.fullText && !conv.indexing && !conv.indexed) {
+        conv.indexing = true;
+        indexBtn.style.display = "none";
+        progressBar.style.display = "block";
+        progressFill.style.width = "0%";
+        indexStatus.textContent = "Indexing...";
+
+        ragEngine.indexDocumentWithProgress(itemId, conv.fullText, (percent, status) => {
+          indexStatus.textContent = status;
+          progressFill.style.width = percent + "%";
+        }).then(() => {
+          conv.indexed = true;
+          conv.indexing = false;
+          indexStatus.textContent = "Indexed";
+          indexStatus.style.color = "#4CAF50";
+          progressBar.style.display = "none";
+          indexBtn.textContent = "Re-index";
+          indexBtn.style.display = "inline-block";
+        }).catch((e) => {
+          conv.indexing = false;
+          indexStatus.textContent = "Index failed";
+          indexStatus.style.color = "#f44336";
+          progressBar.style.display = "none";
+          indexBtn.style.display = "inline-block";
+        });
+      }
+    });
+
     // Messages area
     const messages = doc.createElement("div");
     messages.className = "air-messages";
 
-    const conv = this.getConversation(itemId);
     for (const msg of conv.messages) {
       messages.appendChild(this.createMessageElement(doc, msg.role, msg.content));
     }
@@ -633,6 +693,58 @@ class AIPanel {
     if (textarea) textarea.disabled = !enabled;
     if (sendBtn) sendBtn.disabled = !enabled;
     skillBtns.forEach((btn) => ((btn as HTMLButtonElement).disabled = !enabled));
+  }
+
+  private updateIndexStatus(
+    conv: ConversationState,
+    itemId: number,
+    statusEl: HTMLSpanElement,
+    btnEl: HTMLButtonElement,
+    progressBar: HTMLDivElement,
+    progressFill: HTMLDivElement,
+    barEl: HTMLDivElement
+  ) {
+    // Hide the entire bar if embedding is not enabled
+    if (!isEmbeddingEnabled()) {
+      barEl.style.display = "none";
+      return;
+    }
+
+    barEl.style.display = "flex";
+
+    if (conv.indexed) {
+      statusEl.textContent = "Indexed";
+      statusEl.style.color = "#4CAF50";
+      btnEl.textContent = "Re-index";
+      btnEl.style.display = "inline-block";
+      btnEl.style.background = "#f5f5f5";
+      btnEl.style.color = "#0078d7";
+      progressBar.style.display = "none";
+    } else if (conv.indexing) {
+      statusEl.textContent = "Indexing...";
+      statusEl.style.color = "#ff9800";
+      btnEl.style.display = "none";
+      progressBar.style.display = "block";
+    } else {
+      // Check if already indexed in rag engine
+      if (ragEngine.isIndexed(itemId)) {
+        statusEl.textContent = "Indexed";
+        statusEl.style.color = "#4CAF50";
+        btnEl.textContent = "Re-index";
+        btnEl.style.display = "inline-block";
+        btnEl.style.background = "#f5f5f5";
+        btnEl.style.color = "#0078d7";
+        progressBar.style.display = "none";
+      } else {
+        statusEl.textContent = "Not indexed";
+        statusEl.style.color = "#999";
+        btnEl.textContent = "Index";
+        btnEl.style.display = "inline-block";
+        btnEl.style.background = "#0078d7";
+        btnEl.style.color = "white";
+        progressBar.style.display = "none";
+      }
+    }
   }
 }
 

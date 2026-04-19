@@ -21,6 +21,7 @@ export type FluentMessageId =
   | 'pref-enable'
   | 'pref-help'
   | 'pref-history-rounds'
+  | 'pref-indexing-mode'
   | 'pref-input'
   | 'pref-language'
   | 'pref-llm-provider'

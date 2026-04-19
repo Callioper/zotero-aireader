@@ -52,7 +52,17 @@ export function isEmbeddingEnabled(): boolean {
 
 /** Auto-index PDF when opened (only meaningful when embedding is enabled) */
 export function isAutoIndex(): boolean {
-  return isEmbeddingEnabled() && getPref("autoIndex") !== false;
+  return isEmbeddingEnabled() && getPref("indexingMode") === "auto";
+}
+
+/** Manual indexing mode */
+export function isManualIndex(): boolean {
+  return isEmbeddingEnabled() && getPref("indexingMode") === "manual";
+}
+
+/** Get indexing mode: "auto" or "manual" */
+export function getIndexingMode(): string {
+  return (getPref("indexingMode") as string) || "manual";
 }
 
 /** Number of conversation rounds to keep */
