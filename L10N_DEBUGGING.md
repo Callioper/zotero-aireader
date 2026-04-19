@@ -101,6 +101,14 @@ data-l10n-id="pref-llm-provider"
 data-l10n-id="zoteroAIRreader-pref-llm-provider"
 ```
 
+**自动修复脚本**（PowerShell）：
+```powershell
+cd D:\opencode\ai-reader-zotero-plugin
+$content = Get-Content "addon\content\preferences.xhtml" -Raw
+$content = $content -replace 'data-l10n-id="(pref-[^"]*)"', 'data-l10n-id="zoteroAIRreader-$1"'
+Set-Content "addon\content\preferences.xhtml" -Value $content -NoNewline
+```
+
 ### 4. 防止重复注册
 
 在 `onShutdown` 中确保完全清理：
@@ -131,15 +139,23 @@ function onShutdown() {
 
 ### 5. 检查清单 - 发布前必须验证
 
-```
-✅ 1. FTL 文件包含所有 l10n key（无遗漏）
-✅ 2. XHTML 中所有 data-l10n-id 使用完整 key（带前缀）
-✅ 3. bootstrap.js 正确注册 chrome locale
-✅ 4. hooks.ts 中 FTL 在 registerMenu 之前加载
-✅ 5. onShutdown 完全清理所有注册
-✅ 6. 构建产物中 FTL 文件存在且格式正确
-✅ 7. 在 Zotero 中测试：设置面板文字显示
-✅ 8. 在 Zotero 中测试：右键菜单工作
+```powershell
+# 1. FTL 文件包含所有 l10n key（无遗漏）
+Get-Content addon\locale\zh-CN\addon.ftl | Select-String "zoteroAIRreader-pref-"
+
+# 2. XHTML 中所有 data-l10n-id 使用完整 key（带前缀）
+Select-String -Path "addon\content\preferences.xhtml" -Pattern 'data-l10n-id="(?!zoteroAIRreader-)[^"]+"'
+# 应该返回空
+
+# 3. 构建产物中 FTL 文件存在且格式正确
+Get-Item .scaffold\build\addon\locale\zh-CN\zoteroAIRreader-addon.ftl | Select-Object Length
+# 应该 > 3000 bytes
+
+# 4. 构建产物中 XHTML 的 l10n-id 正确
+Select-String -Path ".scaffold\build\addon\content\preferences.xhtml" -Pattern 'data-l10n-id="zoteroAIRreader-pref-' | Select-Object -First 3
+
+# 5. 在 Zotero 中测试：设置面板文字显示
+# 6. 在 Zotero 中测试：右键菜单工作
 ```
 
 ## 快速诊断命令
@@ -155,7 +171,9 @@ Get-Content zoteroAIRreader-addon.ftl | Select-String "zoteroAIRreader-"
 
 ```powershell
 # 检查是否有不完整 key（不带前缀）
-Select-String -Path "*.xhtml" -Pattern 'data-l10n-id="(?!zoteroAIRreader-)[^"]+"'
+Select-String -Path "addon\content\preferences.xhtml" -Pattern 'data-l10n-id="(?!zoteroAIRreader-)[^"]+"'
+
+# 应该返回空（没有匹配），说明所有 key 都有前缀
 ```
 
 ### 构建后检查
