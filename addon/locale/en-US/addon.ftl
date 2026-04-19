@@ -21,6 +21,10 @@ pref-llm-provider = LLM Provider
 pref-api-base-url = API Base URL
 pref-api-key = API Key
 pref-model-name = Chat Model
+pref-test-chat = Test Connection
+pref-test-chat-testing = Testing...
+pref-test-chat-success = ✓ Connected
+pref-test-chat-failed = ✗ Failed
 
 # Preferences - Embedding
 pref-embedding-enabled = Enable Embedding (vector search)
@@ -29,6 +33,10 @@ pref-embedding-base-url = Embedding Server
 pref-embedding-api-key = Embedding API Key
 pref-embedding-model = Embedding Model
 pref-indexing-mode = Indexing Mode
+pref-test-embedding = Test Connection
+pref-test-embedding-testing = Testing...
+pref-test-embedding-success = ✓ Connected
+pref-test-embedding-failed = ✗ Failed
 
 # Preferences - Features
 pref-language = Default Language

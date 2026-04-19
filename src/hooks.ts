@@ -1,6 +1,7 @@
 import { config } from "../package.json";
 import { aiPanel } from "./modules/ai-panel";
 import { isEnabled } from "./utils/prefs";
+import { llmChatHealthCheck, llmEmbedHealthCheck } from "./modules/llm-client";
 
 declare const rootURI: string;
 
@@ -32,6 +33,12 @@ async function onStartup() {
 
   // Register the AI panel in the right-side item pane
   registeredSectionID = aiPanel.register();
+
+  // Expose health check functions to global API for preferences pane
+  Zotero[config.addonInstance].api = {
+    llmChatHealthCheck,
+    llmEmbedHealthCheck,
+  };
 
   Zotero[config.addonInstance].data.initialized = true;
   Zotero.debug("AI Reader: startup complete");

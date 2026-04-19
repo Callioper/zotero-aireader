@@ -21,6 +21,10 @@ pref-llm-provider = LLM 提供商
 pref-api-base-url = API 地址
 pref-api-key = API 密钥
 pref-model-name = 对话模型
+pref-test-chat = 测试连接
+pref-test-chat-testing = 测试中...
+pref-test-chat-success = ✓ 连接成功
+pref-test-chat-failed = ✗ 连接失败
 
 # Preferences - Embedding
 pref-embedding-enabled = 启用向量检索 (Embedding)
@@ -29,6 +33,10 @@ pref-embedding-base-url = Embedding 服务器
 pref-embedding-api-key = Embedding API 密钥
 pref-embedding-model = Embedding 模型
 pref-indexing-mode = 索引模式
+pref-test-embedding = 测试连接
+pref-test-embedding-testing = 测试中...
+pref-test-embedding-success = ✓ 连接成功
+pref-test-embedding-failed = ✗ 连接失败
 
 # Preferences - Features
 pref-language = 默认语言

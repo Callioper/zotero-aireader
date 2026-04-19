@@ -1,5 +1,6 @@
 <linkset>
   <html:link rel="localization" href="__addonRef__-addon.ftl" />
+  <html:script src="chrome://__addonRef__/content/preferences.js" />
 </linkset>
 <groupbox>
   <label><html:h2 data-l10n-id="zoteroAIRreader-pref-title"></html:h2></label>
@@ -11,7 +12,7 @@
     data-l10n-id="zoteroAIRreader-pref-enable"
   />
 
-  <!-- ══�?Chat LLM Configuration ══�?-->
+  <!-- ══�?Chat LLM Configuration ══�?-->
   <label><html:h3 data-l10n-id="zoteroAIRreader-pref-section-chat"></html:h3></label>
   <html:p data-l10n-id="zoteroAIRreader-pref-section-chat-desc" style="color: #666; font-size: 12px; margin: 0 0 8px 0;"></html:p>
 
@@ -81,9 +82,22 @@
     ></html:input>
   </hbox>
 
+  <hbox align="center" style="margin-top: 8px;">
+    <html:div style="width: 140px;"></html:div>
+    <html:button
+      id="zotero-prefpane-__addonRef__-test-chat"
+      data-l10n-id="zoteroAIRreader-pref-test-chat"
+      style="min-width: 120px;"
+    ></html:button>
+    <html:span
+      id="zotero-prefpane-__addonRef__-test-chat-result"
+      style="margin-left: 12px; color: #666;"
+    ></html:span>
+  </hbox>
+
   <separator class="thin" />
 
-  <!-- ══�?Embedding Configuration (Optional) ══�?-->
+  <!-- ══�?Embedding Configuration (Optional) ══�?-->
   <label><html:h3 data-l10n-id="zoteroAIRreader-pref-section-embedding"></html:h3></label>
   <html:p data-l10n-id="zoteroAIRreader-pref-section-embedding-desc" style="color: #666; font-size: 12px; margin: 0 0 8px 0;"></html:p>
 
@@ -178,6 +192,19 @@
     ></html:input>
   </hbox>
 
+  <hbox align="center" style="margin-top: 8px;">
+    <html:div style="width: 140px;"></html:div>
+    <html:button
+      id="zotero-prefpane-__addonRef__-test-embedding"
+      data-l10n-id="zoteroAIRreader-pref-test-embedding"
+      style="min-width: 120px;"
+    ></html:button>
+    <html:span
+      id="zotero-prefpane-__addonRef__-test-embedding-result"
+      style="margin-left: 12px; color: #666;"
+    ></html:span>
+  </hbox>
+
   <checkbox
     id="zotero-prefpane-__addonRef__-auto-index"
     preference="autoIndex"
@@ -186,7 +213,7 @@
 
   <separator class="thin" />
 
-  <!-- ══�?Feature Configuration ══�?-->
+  <!-- ══�?Feature Configuration ══�?-->
   <label><html:h3 data-l10n-id="zoteroAIRreader-pref-section-features"></html:h3></label>
 
   <hbox align="center">
@@ -225,7 +252,7 @@
 
   <separator class="thin" />
 
-  <!-- ══�?Annotation Configuration ══�?-->
+  <!-- ══�?Annotation Configuration ══�?-->
   <label><html:h3 data-l10n-id="zoteroAIRreader-pref-section-annotations"></html:h3></label>
 
   <checkbox
