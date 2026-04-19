@@ -5,7 +5,7 @@
         {
           "version": "1.2.2",
           "update_link": "https://github.com/Callioper/zotero-aireader/releases/download/v1.2.2/zotero-ai-reader.xpi",
-          "update_hash": "sha256:ade3971cde0267c80dfaef7c5d4e3f2e8c16b9965479152442d1cdaa6b5ea2f9",
+          "update_hash": "sha256:16b3db49e192f092a992a2f462b3349521fced451b65e7ce6c283b96d5703273",
           "applications": {
             "zotero": {
               "strict_min_version": "6.999",
