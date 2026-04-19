@@ -16,16 +16,13 @@ async function onStartup() {
 
   Zotero.debug("AI Reader: onStartup called");
 
-  // Initialize localization
-  const l10n = new Localization([`${config.addonRef}-addon.ftl`], true);
-  Zotero[config.addonInstance].data.locale = { current: l10n };
-
   // CRITICAL: Add FTL resources to main window BEFORE registering menus
-  // Otherwise menu l10nID won't resolve and labels will be empty
+  // This ensures menu labels are properly resolved via document.l10n
+  // Do NOT create a new Localization() instance here — use the main window's l10n system
   const mainWindow = Zotero.getMainWindow();
   if (mainWindow && mainWindow.document.l10n) {
     mainWindow.document.l10n.addResourceIds([`${config.addonRef}-addon.ftl`]);
-    Zotero.debug("AI Reader: FTL resources added to main window");
+    Zotero.debug("AI Reader: FTL resources added to main window via document.l10n");
   }
 
   registerNotifier();
@@ -57,6 +54,14 @@ function onShutdown() {
       Zotero.debug("AI Reader: error unregistering prefs pane: " + e);
     }
     registeredPrefsPaneID = false;
+  }
+
+  // Unregister menu to prevent duplicate registration on reload
+  try {
+    Zotero.MenuManager.unregisterMenu("air-reader-menu");
+    Zotero.debug("AI Reader: menu unregistered");
+  } catch (e) {
+    Zotero.debug("AI Reader: menu unregister error (may not exist): " + e);
   }
 
   // @ts-ignore - Plugin instance is not typed
