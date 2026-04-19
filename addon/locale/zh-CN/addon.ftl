@@ -24,6 +24,9 @@ pref-model-name = 对话模型
 
 # Preferences - Embedding
 pref-embedding-enabled = 启用向量检索 (Embedding)
+pref-embedding-provider = Embedding 提供商
+pref-embedding-base-url = Embedding 服务器
+pref-embedding-api-key = Embedding API 密钥
 pref-embedding-model = Embedding 模型
 
 # Preferences - Features

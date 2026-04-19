@@ -24,6 +24,9 @@ pref-model-name = Chat Model
 
 # Preferences - Embedding
 pref-embedding-enabled = Enable Embedding (vector search)
+pref-embedding-provider = Embedding Provider
+pref-embedding-base-url = Embedding Server
+pref-embedding-api-key = Embedding API Key
 pref-embedding-model = Embedding Model
 
 # Preferences - Features

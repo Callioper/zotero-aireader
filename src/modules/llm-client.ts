@@ -77,6 +77,36 @@ function getConfig(): { baseUrl: string; apiKey: string; model: string; embeddin
   return { baseUrl, apiKey, model, embeddingModel, provider };
 }
 
+interface EmbeddingConfig {
+  provider: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
+function getEmbeddingConfig(): EmbeddingConfig {
+  // Check if embedding has its own provider or uses chat provider
+  const embeddingProvider = (getPref("embeddingProvider") as string) || "same";
+  const provider = embeddingProvider === "same" ? (getPref("llmProvider") as string) || "ollama" : embeddingProvider;
+
+  // Get base URL - use embedding-specific or fall back to chat
+  let baseUrl = (getPref("embeddingBaseUrl") as string) || "";
+  if (!baseUrl) {
+    baseUrl = (getPref("apiBaseUrl") as string) || getDefaultBaseUrl(provider);
+  }
+
+  // Get API key - use embedding-specific or fall back to chat
+  let apiKey = (getPref("embeddingApiKey") as string) || "";
+  if (!apiKey) {
+    apiKey = (getPref("apiKey") as string) || "";
+  }
+
+  // Get model
+  const model = (getPref("embeddingModel") as string) || getDefaultEmbeddingModel(provider);
+
+  return { provider, baseUrl, apiKey, model };
+}
+
 function getDefaultBaseUrl(provider: string): string {
   switch (provider) {
     case "openai": return "https://api.openai.com";
@@ -182,29 +212,29 @@ export async function llmChat(options: LLMChatOptions): Promise<string> {
  * Has built-in timeout (default 30s) to prevent blocking.
  */
 export async function llmEmbed(texts: string[], options?: LLMEmbedOptions): Promise<number[][]> {
-  const { baseUrl, apiKey, embeddingModel, provider } = getConfig();
-  const providerCfg = PROVIDER_CONFIGS[provider] || PROVIDER_CONFIGS["openai-compatible"];
+  const embedConfig = getEmbeddingConfig();
+  const providerCfg = PROVIDER_CONFIGS[embedConfig.provider] || PROVIDER_CONFIGS["openai-compatible"];
 
-  const url = baseUrl.replace(/\/$/, "") + providerCfg.embeddingPath;
+  const url = embedConfig.baseUrl.replace(/\/$/, "") + providerCfg.embeddingPath;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...providerCfg.authHeader(apiKey),
+    ...providerCfg.authHeader(embedConfig.apiKey),
   };
 
   const timeout = options?.timeout ?? EMBED_TIMEOUT;
 
   // Ollama uses a different embedding API format
-  if (provider === "ollama") {
-    return await ollamaEmbed(url, headers, texts, embeddingModel, timeout);
+  if (embedConfig.provider === "ollama") {
+    return await ollamaEmbed(url, headers, texts, embedConfig.model, timeout);
   }
 
   // OpenAI-compatible embedding API
   const body = {
-    model: embeddingModel,
+    model: embedConfig.model,
     input: texts,
   };
 
-  Zotero.debug(`AI Reader Embed: POST ${url} model=${embeddingModel} texts=${texts.length}`);
+  Zotero.debug(`AI Reader Embed: POST ${url} model=${embedConfig.model} texts=${texts.length}`);
 
   let response: Response;
   try {

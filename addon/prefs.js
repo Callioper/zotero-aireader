@@ -12,6 +12,9 @@ pref("modelName", "");
 
 // Embedding (optional — disabled by default)
 pref("embeddingEnabled", false);
+pref("embeddingProvider", "ollama");  // same as chat or separate
+pref("embeddingBaseUrl", "");
+pref("embeddingApiKey", "");
 pref("embeddingModel", "");
 
 // Features

@@ -95,6 +95,58 @@
 
   <hbox align="center">
     <html:label
+      for="zotero-prefpane-__addonRef__-embedding-provider"
+      data-l10n-id="pref-embedding-provider"
+      style="width: 140px;"
+    ></html:label>
+    <menulist
+      id="zotero-prefpane-__addonRef__-embedding-provider"
+      preference="embeddingProvider"
+      style="min-width: 200px;"
+    >
+      <menupopup>
+        <menuitem label="Same as chat model" value="same" />
+        <menuitem label="Ollama (local)" value="ollama" />
+        <menuitem label="LM Studio (local)" value="lmstudio" />
+        <menuitem label="DeepSeek" value="deepseek" />
+        <menuitem label="OpenAI" value="openai" />
+        <menuitem label="OpenAI Compatible" value="openai-compatible" />
+      </menupopup>
+    </menulist>
+  </hbox>
+
+  <hbox align="center">
+    <html:label
+      for="zotero-prefpane-__addonRef__-embedding-base-url"
+      data-l10n-id="pref-embedding-base-url"
+      style="width: 140px;"
+    ></html:label>
+    <html:input
+      type="text"
+      id="zotero-prefpane-__addonRef__-embedding-base-url"
+      preference="embeddingBaseUrl"
+      placeholder="Leave empty to use chat model server"
+      style="flex: 1; min-width: 250px;"
+    ></html:input>
+  </hbox>
+
+  <hbox align="center">
+    <html:label
+      for="zotero-prefpane-__addonRef__-embedding-api-key"
+      data-l10n-id="pref-embedding-api-key"
+      style="width: 140px;"
+    ></html:label>
+    <html:input
+      type="password"
+      id="zotero-prefpane-__addonRef__-embedding-api-key"
+      preference="embeddingApiKey"
+      placeholder="Leave empty to use chat model API key"
+      style="flex: 1; min-width: 250px;"
+    ></html:input>
+  </hbox>
+
+  <hbox align="center">
+    <html:label
       for="zotero-prefpane-__addonRef__-embedding-model"
       data-l10n-id="pref-embedding-model"
       style="width: 140px;"
