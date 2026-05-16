@@ -6,6 +6,7 @@ import { isAutoHighlight, isAutoIndex, getSkillColor, isEmbeddingEnabled } from 
 import { llmChat, LLMMessage, isChatConfigured } from "./llm-client";
 import { ragEngine } from "./rag-engine";
 import { truncateText, extractItemMetadata } from "./pdf-text";
+import { conversationStore } from "./conversation-store";
 
 declare const rootURI: string;
 
@@ -86,7 +87,7 @@ class AIPanel {
         setEnabled(false);
       },
 
-      onRender: ({ doc, body, item }) => {
+      onRender: async ({ doc, body, item }) => {
         body.replaceChildren();
         this.pane = { doc, body };
 
@@ -97,6 +98,14 @@ class AIPanel {
 
         const itemId = this.resolveItemId(item);
         this.currentItemId = itemId;
+
+        const saved = await conversationStore.load(itemId);
+        if (saved && saved.messages.length > 0) {
+          const conv = this.getConversation(itemId);
+          conv.messages = saved.messages;
+          conv.metadata = saved.metadata;
+        }
+
         this.cacheMetadata(itemId, item);
 
         if (!isChatConfigured()) {
@@ -183,6 +192,11 @@ class AIPanel {
       });
     }
     return this.conversations.get(itemId)!;
+  }
+
+  private saveConversation(itemId: number) {
+    const conv = this.getConversation(itemId);
+    conversationStore.save(itemId, conv.messages, conv.metadata);
   }
 
   // ─── Metadata & Text Caching (no API calls) ──────────────
@@ -621,6 +635,7 @@ class AIPanel {
 
       conv.messages.push({ role: "assistant", content: displayContent });
       this.appendMessage(body, doc, "assistant", displayContent);
+      this.saveConversation(itemId);
     } catch (error) {
       conv.messages.pop();
       loadingEl.remove();
@@ -628,6 +643,7 @@ class AIPanel {
       const errMsg = `\u8bf7\u6c42\u5931\u8d25: ${error}`;
       conv.messages.push({ role: "error", content: errMsg });
       this.appendMessage(body, doc, "error", errMsg);
+      this.saveConversation(itemId);
     } finally {
       this.setInputEnabled(body, true);
     }
