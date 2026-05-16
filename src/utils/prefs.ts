@@ -25,26 +25,6 @@ export function isEnabled(): boolean {
   return getPref("enable") !== false;
 }
 
-/** Backend API URL */
-export function getApiUrl(): string {
-  return (getPref("apiUrl") as string) || "http://127.0.0.1:8765/api";
-}
-
-/** LLM provider name */
-export function getLLMProvider(): string {
-  return (getPref("llmProvider") as string) || "ollama";
-}
-
-/** LLM model name */
-export function getModelName(): string {
-  return (getPref("modelName") as string) || "";
-}
-
-/** Default output language */
-export function getLanguage(): string {
-  return (getPref("language") as string) || "zh";
-}
-
 /** Whether embedding / RAG is enabled */
 export function isEmbeddingEnabled(): boolean {
   return getPref("embeddingEnabled") === true;
@@ -53,22 +33,6 @@ export function isEmbeddingEnabled(): boolean {
 /** Auto-index PDF when opened (only meaningful when embedding is enabled) */
 export function isAutoIndex(): boolean {
   return isEmbeddingEnabled() && getPref("indexingMode") === "auto";
-}
-
-/** Manual indexing mode */
-export function isManualIndex(): boolean {
-  return isEmbeddingEnabled() && getPref("indexingMode") === "manual";
-}
-
-/** Get indexing mode: "auto" or "manual" */
-export function getIndexingMode(): string {
-  return (getPref("indexingMode") as string) || "manual";
-}
-
-/** Number of conversation rounds to keep */
-export function getHistoryRounds(): number {
-  const val = getPref("historyRounds");
-  return typeof val === "number" ? val : 10;
 }
 
 /** Auto-create highlight annotations from AI quotes */

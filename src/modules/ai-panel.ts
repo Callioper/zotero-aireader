@@ -618,13 +618,18 @@ class AIPanel {
       msgEl = this.appendMessage(body, doc, "assistant", "");
 
       let fullResponse = "";
+      let lastScroll = 0;
       const answer = await llmChatStream(
         { messages },
         (token) => {
           fullResponse += token;
           msgEl.textContent = fullResponse;
-          const messagesEl = body.querySelector(".air-messages");
-          if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+          const now = Date.now();
+          if (now - lastScroll > 50) {
+            lastScroll = now;
+            const messagesEl = body.querySelector(".air-messages");
+            if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
         },
       );
 
@@ -633,7 +638,13 @@ class AIPanel {
       loadingEl.remove();
 
       // Final render with HTML formatting and quote buttons
-      msgEl.innerHTML = this.renderAssistantMessage(fullResponse);
+      let displayContent = answer;
+      const result = skill?.parseResult(answer);
+      if (result && result.quotes.length > 0) {
+        const footer = `\n\n_\u5df2\u63d0\u53d6 ${result.quotes.length} \u6761\u539f\u6587\u5f15\u7528\uff0c\u53ef\u70b9\u51fb \u{1F4CD} \u5b9a\u4f4d\u539f\u6587_`;
+        displayContent += footer;
+      }
+      msgEl.innerHTML = this.renderAssistantMessage(displayContent);
       msgEl.querySelectorAll(".air-quote-locate").forEach((btn) => {
         btn.addEventListener("click", (e) => {
           const quoteText = (e.target as HTMLElement).dataset.quote || "";
@@ -641,19 +652,8 @@ class AIPanel {
         });
       });
 
-      let displayContent: string;
-      if (skill) {
-        const result = skill.parseResult(answer);
-        displayContent = answer;
-        if (result.quotes.length > 0) {
-          displayContent += `\n\n_\u5df2\u63d0\u53d6 ${result.quotes.length} \u6761\u539f\u6587\u5f15\u7528\uff0c\u53ef\u70b9\u51fb \u{1F4CD} \u5b9a\u4f4d\u539f\u6587_`;
-        }
-
-        if (result.quotes.length > 0 && isAutoHighlight()) {
-          this.createQuoteAnnotations(itemId, result.quotes, skill, body, doc);
-        }
-      } else {
-        displayContent = answer;
+      if (skill && result && result.quotes.length > 0 && isAutoHighlight()) {
+        this.createQuoteAnnotations(itemId, result.quotes, skill, body, doc);
       }
 
       conv.messages.push({ role: "assistant", content: displayContent });

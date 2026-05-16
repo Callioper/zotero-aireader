@@ -1,5 +1,8 @@
 # Zotero AI Reader Implementation Plan
 
+> **DEPRECATED (2026-04-18):** This plan describes the original Python backend architecture which is no longer used.
+> The plugin now uses **pure built-in mode**. See the current roadmap: `docs/superpowers/plans/2026-05-17-zotero-ai-reader-roadmap.md`
+
 > **For agentic workers:** Use subagent-driven-development (recommended) or executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Develop a Zotero plugin with AI-powered PDF reading capabilities (Q&A, summarization, semantic search, note enhancement) using a separate Python backend service.

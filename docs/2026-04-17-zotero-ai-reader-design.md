@@ -1,5 +1,8 @@
 # Zotero AI 阅读助手插件设计
 
+> **NOTE:** This is the original design doc (2026-04-17). Architecture has evolved to **pure built-in mode**.
+> See the current roadmap: `docs/superpowers/plans/2026-05-17-zotero-ai-reader-roadmap.md`
+
 **日期：** 2026-04-17
 **目标：** 开发 Zotero 插件，实现 AI 阅读助手功能
 

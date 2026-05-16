@@ -23,19 +23,6 @@ export interface AnnotationResult {
 }
 
 /**
- * Parse all [[QUOTE: "..."]] markers from text.
- */
-export function parseQuotes(text: string): string[] {
-  const quotes: string[] = [];
-  const regex = /\[\[QUOTE:\s*"([^"]+)"\]\]/g;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(text)) !== null) {
-    quotes.push(match[1]);
-  }
-  return quotes;
-}
-
-/**
  * Create annotations for all quotes extracted from an AI response.
  *
  * @param attachmentId - The PDF attachment's Zotero item ID
@@ -331,31 +318,6 @@ function findReaderForAttachment(attachmentId: number): any | null {
   } catch (e) {
     Zotero.debug("AI Reader: failed to find reader instance: " + e);
     return null;
-  }
-}
-
-/**
- * Navigate the active reader to a specific page.
- * Useful for the "locate" button in the AI panel.
- */
-export async function navigateToPage(attachmentId: number, pageIndex: number): Promise<boolean> {
-  try {
-    const reader = findReaderForAttachment(attachmentId);
-    if (!reader) return false;
-
-    const iframeWindow = (reader as any)._iframeWindow;
-    if (!iframeWindow) return false;
-
-    const wrappedWindow = iframeWindow.wrappedJSObject || iframeWindow;
-    const pdfApp = wrappedWindow.PDFViewerApplication;
-    if (pdfApp) {
-      pdfApp.page = pageIndex + 1; // PDF.js uses 1-indexed pages
-      return true;
-    }
-    return false;
-  } catch (e) {
-    Zotero.debug("AI Reader: navigation failed: " + e);
-    return false;
   }
 }
 

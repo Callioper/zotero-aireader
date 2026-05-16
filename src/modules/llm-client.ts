@@ -13,6 +13,7 @@ import { getPref } from "../utils/prefs";
 // ─── Timeout defaults (ms) ─────────────────────────────────
 const CHAT_TIMEOUT = 60_000;       // 60s for chat completions
 const STREAM_TIMEOUT = 300_000;    // 5min for streaming (initial connection only)
+const STREAM_READ_TIMEOUT = 120_000; // 2min idle timeout per read during streaming
 const EMBED_TIMEOUT = 30_000;      // 30s for embedding
 const HEALTH_CHECK_TIMEOUT = 8_000; // 8s for health checks
 
@@ -255,7 +256,13 @@ export async function llmChatStream(
   let buffer = "";
 
   while (true) {
-    const { done, value } = await reader.read();
+    const readResult = await Promise.race([
+      reader.read(),
+      new Promise<ReadableStreamReadResult<Uint8Array>>((_, reject) =>
+        setTimeout(() => reject(new Error(`Stream read timed out after ${STREAM_READ_TIMEOUT / 1000}s idle`)), STREAM_READ_TIMEOUT)
+      ),
+    ]);
+    const { done, value } = readResult;
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
