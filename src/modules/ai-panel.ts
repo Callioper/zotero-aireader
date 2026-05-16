@@ -234,10 +234,10 @@ class AIPanel {
   private showEmptyState(l10nKey: string) {
     const pane = this.pane;
     if (!pane) return;
-    pane.body.innerHTML = "";
+    pane.body.replaceChildren();
     const div = document.createElement("div");
     div.className = "ai-empty-state";
-    div.textContent = pane.doc.l10n?.formatValue(l10nKey) || l10nKey;
+    div.dataset.l10nId = `${config.addonRef}-${l10nKey}`;
     pane.body.appendChild(div);
   }
 
