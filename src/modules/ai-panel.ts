@@ -3,7 +3,7 @@ import { ALL_SKILLS, AISkill, SkillContext, ItemMetadata } from "./skills";
 import { findAndNavigateToText, createAnnotationsFromQuotes } from "./annotation-manager";
 import { ExtractedQuote } from "./skills/types";
 import { isAutoHighlight, isAutoIndex, getSkillColor, isEmbeddingEnabled } from "../utils/prefs";
-import { llmChat, LLMMessage, isChatConfigured } from "./llm-client";
+import { llmChat, llmChatStream, LLMMessage, isChatConfigured } from "./llm-client";
 import { ragEngine } from "./rag-engine";
 import { truncateText, extractItemMetadata } from "./pdf-text";
 import { conversationStore } from "./conversation-store";
@@ -612,11 +612,32 @@ class AIPanel {
       messages.push({ role: "system", content: systemContent });
       messages.push({ role: "user", content: question });
 
-      const answer = await llmChat({ messages });
+      // Create assistant message bubble FIRST (empty)
+      const msgEl = this.appendMessage(body, doc, "assistant", "");
+
+      let fullResponse = "";
+      const answer = await llmChatStream(
+        { messages },
+        (token) => {
+          fullResponse += token;
+          msgEl.textContent = fullResponse;
+          const messagesEl = body.querySelector(".air-messages");
+          if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+        },
+      );
 
       // Remove loading message
       conv.messages.pop();
       loadingEl.remove();
+
+      // Final render with HTML formatting and quote buttons
+      msgEl.innerHTML = this.renderAssistantMessage(fullResponse);
+      msgEl.querySelectorAll(".air-quote-locate").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          const quoteText = (e.target as HTMLElement).dataset.quote || "";
+          this.onLocateQuote(quoteText);
+        });
+      });
 
       let displayContent: string;
       if (skill) {
@@ -634,7 +655,6 @@ class AIPanel {
       }
 
       conv.messages.push({ role: "assistant", content: displayContent });
-      this.appendMessage(body, doc, "assistant", displayContent);
       this.saveConversation(itemId);
     } catch (error) {
       conv.messages.pop();

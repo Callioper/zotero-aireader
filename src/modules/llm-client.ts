@@ -12,6 +12,7 @@ import { getPref } from "../utils/prefs";
 
 // ─── Timeout defaults (ms) ─────────────────────────────────
 const CHAT_TIMEOUT = 60_000;       // 60s for chat completions
+const STREAM_TIMEOUT = 300_000;    // 5min for streaming (initial connection only)
 const EMBED_TIMEOUT = 30_000;      // 30s for embedding
 const HEALTH_CHECK_TIMEOUT = 8_000; // 8s for health checks
 
@@ -205,6 +206,92 @@ export async function llmChat(options: LLMChatOptions): Promise<string> {
   throw new Error("Unexpected LLM response format: " + JSON.stringify(data).substring(0, 200));
 }
 
+/**
+ * Streaming chat completion - calls onToken for each received token.
+ * Uses a longer timeout for initial connection only; the stream stays open.
+ */
+export async function llmChatStream(
+  options: LLMChatOptions,
+  onToken: (token: string) => void,
+): Promise<string> {
+  const { baseUrl, apiKey, model, provider } = getConfig();
+  const providerCfg = PROVIDER_CONFIGS[provider] || PROVIDER_CONFIGS["openai-compatible"];
+
+  const url = baseUrl.replace(/\/$/, "") + providerCfg.chatPath;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...providerCfg.authHeader(apiKey),
+  };
+
+  const body: any = {
+    model,
+    messages: options.messages,
+    temperature: options.temperature ?? 0.7,
+    max_tokens: options.maxTokens ?? 4096,
+    stream: true,
+  };
+
+  Zotero.debug(`AI Reader LLM Stream: POST ${url} model=${model}`);
+
+  const response = await Promise.race([
+    fetch(url, { method: "POST", headers, body: JSON.stringify(body) }),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Stream request timed out after ${STREAM_TIMEOUT / 1000}s`)), STREAM_TIMEOUT)
+    ),
+  ]);
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`LLM API error ${response.status}: ${errText}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Response body is not readable (streaming not supported)");
+  }
+
+  const decoder = new TextDecoder();
+  let fullText = "";
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith("data:")) continue;
+
+      const data = trimmed.slice(5).trim();
+      if (data === "[DONE]") continue;
+
+      try {
+        const parsed = JSON.parse(data);
+        let token: string | undefined;
+
+        if (parsed.choices?.[0]?.delta?.content) {
+          token = parsed.choices[0].delta.content;
+        } else if (parsed.message?.content) {
+          token = parsed.message.content;
+        }
+
+        if (token) {
+          fullText += token;
+          onToken(token);
+        }
+      } catch {
+        // Skip malformed JSON lines
+      }
+    }
+  }
+
+  return fullText;
+}
+
 // ─── Embedding ──────────────────────────────────────────────
 
 /**
@@ -345,7 +432,4 @@ export function isChatConfigured(): boolean {
   return !!(baseUrl && model);
 }
 
-/** Check if embedding is enabled in preferences */
-export function isEmbeddingEnabled(): boolean {
-  return getPref("embeddingEnabled") === true;
-}
+
