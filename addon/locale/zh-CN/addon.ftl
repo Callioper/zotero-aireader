@@ -90,3 +90,11 @@ setup-step2 = 填写 API 地址和模型名称
 setup-open-settings = 打开设置
 setup-chat-error = 对话模型连接失败
 setup-retry = 重试
+
+# Empty / error states
+zotero-air-reader-empty-no-item = 选择一个 PDF 或文献条目以使用 AI 助手
+zotero-air-reader-empty-not-configured = 在首选项中配置 LLM 以开始使用
+zotero-air-reader-empty-no-text = 无法从此 PDF 提取文本
+zotero-air-reader-error-embed = 部分段落嵌入失败，结果可能不完整
+zotero-air-reader-loading-text = 正在提取文本...
+zotero-air-reader-loading-index = 正在索引文档...

@@ -232,3 +232,15 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Empty state */
+.ai-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  color: var(--fill-secondary, #666);
+  font-size: 14px;
+  text-align: center;
+}

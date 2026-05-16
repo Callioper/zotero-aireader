@@ -90,3 +90,11 @@ setup-step2 = Enter the API URL and model name
 setup-open-settings = Open Settings
 setup-chat-error = Chat model connection failed
 setup-retry = Retry
+
+# Empty / error states
+zotero-air-reader-empty-no-item = Select a PDF or library item to use AI Assistant
+zotero-air-reader-empty-not-configured = Configure LLM in Preferences to get started
+zotero-air-reader-empty-no-text = Could not extract text from this PDF
+zotero-air-reader-error-embed = Embedding failed for some chunks. Results may be incomplete.
+zotero-air-reader-loading-text = Extracting text...
+zotero-air-reader-loading-index = Indexing document...

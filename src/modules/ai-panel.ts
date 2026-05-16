@@ -5,7 +5,7 @@ import { ExtractedQuote } from "./skills/types";
 import { isAutoHighlight, isAutoIndex, getSkillColor, isEmbeddingEnabled } from "../utils/prefs";
 import { llmChat, LLMMessage, isChatConfigured } from "./llm-client";
 import { ragEngine } from "./rag-engine";
-import { truncateText } from "./pdf-text";
+import { truncateText, extractItemMetadata } from "./pdf-text";
 
 declare const rootURI: string;
 
@@ -41,6 +41,7 @@ class AIPanel {
   private currentItemId: number | null = null;
   private activeSkill: AISkill | null = null;
   private pendingSelectedText: string | null = null;
+  private pane: { doc: Document; body: HTMLElement } | null = null;
 
   /**
    * Register the AI panel as a custom section in the item pane.
@@ -87,9 +88,10 @@ class AIPanel {
 
       onRender: ({ doc, body, item }) => {
         body.replaceChildren();
+        this.pane = { doc, body };
 
         if (!item) {
-          body.textContent = "No item selected";
+          this.showEmptyState("zotero-air-reader-empty-no-item");
           return;
         }
 
@@ -97,7 +99,6 @@ class AIPanel {
         this.currentItemId = itemId;
         this.cacheMetadata(itemId, item);
 
-        // Check if chat is configured — if not, show setup guide
         if (!isChatConfigured()) {
           this.buildSetupUI(doc, body);
           return;
@@ -191,27 +192,7 @@ class AIPanel {
     if (conv.metadata) return;
 
     try {
-      let regularItem = item;
-      if (item.isAttachment()) {
-        const parentId = item.parentID;
-        if (parentId) {
-          regularItem = Zotero.Items.get(parentId);
-        }
-      }
-
-      const creators = regularItem.getCreators?.() || [];
-      const creatorNames = creators.map((c: any) => {
-        if (c.firstName && c.lastName) return `${c.firstName} ${c.lastName}`;
-        return c.lastName || c.firstName || c.name || "";
-      });
-
-      conv.metadata = {
-        title: regularItem.getField?.("title") || "",
-        creators: creatorNames,
-        date: regularItem.getField?.("date") || undefined,
-        abstractNote: regularItem.getField?.("abstractNote") || undefined,
-        itemType: regularItem.itemType || undefined,
-      };
+      conv.metadata = extractItemMetadata(item);
     } catch (e) {
       Zotero.debug("AI Reader: failed to extract metadata: " + e);
       conv.metadata = { title: "", creators: [] };
@@ -246,6 +227,18 @@ class AIPanel {
     } catch (e) {
       Zotero.debug("AI Reader: failed to get full text: " + e);
     }
+  }
+
+  // ─── Empty State ──────────────────────────────────────────
+
+  private showEmptyState(l10nKey: string) {
+    const pane = this.pane;
+    if (!pane) return;
+    pane.body.innerHTML = "";
+    const div = document.createElement("div");
+    div.className = "ai-empty-state";
+    div.textContent = pane.doc.l10n?.formatValue(l10nKey) || l10nKey;
+    pane.body.appendChild(div);
   }
 
   // ─── Setup Guide UI (shown when not configured) ──────────
