@@ -163,10 +163,10 @@ ai-reader-zotero-plugin/
 │   ├── hooks.ts                  # Lifecycle: startup/shutdown, menu, prefs, reader listeners
 │   ├── utils/
 │   │   ├── prefs.ts              # Preference get/set helpers
-│   │   └── ztoolkit.ts           # Toolkit utilities
+│   │   └── conversation-store.ts # Conversation persistence
 │   └── modules/
 │       ├── ai-panel.ts           # Main AI panel (ItemPaneManager section)
-│       ├── api-client.ts         # HTTP client for Python backend
+│       ├── llm-client.ts         # LLM API client (chat + embedding)
 │       ├── pdf-text.ts           # PDF text extraction and metadata
 │       ├── annotation-manager.ts # Quote-to-annotation conversion
 │       └── skills/               # AI Skill system
@@ -192,16 +192,7 @@ ai-reader-zotero-plugin/
 │   └── locale/
 │       ├── en-US/addon.ftl       # English strings
 │       └── zh-CN/addon.ftl       # Chinese strings
-├── service/                      # Python FastAPI backend
-│   ├── src/
-│   │   ├── main.py               # FastAPI app
-│   │   ├── llm.py                # LLM manager (supports system_prompt param)
-│   │   ├── config.py             # Settings
-│   │   └── routes/
-│   │       ├── chat.py           # /api/chat (supports skill_prompt field)
-│   │       ├── index.py          # /api/index
-│   │       └── search.py         # /api/search
-│   └── requirements.txt
+├── src/modules/conversation-store.ts  # Conversation persistence
 ├── docs/
 │   ├── opencode-prompts.md       # Stage-based development prompts
 │   └── 2026-04-17-zotero-ai-reader-design.md
