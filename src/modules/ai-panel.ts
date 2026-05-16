@@ -581,6 +581,8 @@ class AIPanel {
 
     this.setInputEnabled(body, false);
 
+    let msgEl: HTMLElement | null = null;
+
     try {
       // Build context: RAG if available, otherwise truncated full text
       let contextBlock = "";
@@ -613,7 +615,7 @@ class AIPanel {
       messages.push({ role: "user", content: question });
 
       // Create assistant message bubble FIRST (empty)
-      const msgEl = this.appendMessage(body, doc, "assistant", "");
+      msgEl = this.appendMessage(body, doc, "assistant", "");
 
       let fullResponse = "";
       const answer = await llmChatStream(
@@ -659,6 +661,7 @@ class AIPanel {
     } catch (error) {
       conv.messages.pop();
       loadingEl.remove();
+      msgEl?.remove();
 
       const errMsg = `\u8bf7\u6c42\u5931\u8d25: ${error}`;
       conv.messages.push({ role: "error", content: errMsg });
