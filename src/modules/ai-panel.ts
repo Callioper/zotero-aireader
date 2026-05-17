@@ -117,10 +117,13 @@ class AIPanel {
           Zotero.debug("AI Reader: onRender - isChatConfigured=" + configured);
 
           if (!configured) {
+            Zotero.debug("AI Reader: onRender - calling buildSetupUI");
             this.buildSetupUI(doc, body);
           } else {
+            Zotero.debug("AI Reader: onRender - calling buildUI");
             this.buildUI(doc, body, itemId);
           }
+          Zotero.debug("AI Reader: onRender - body child count=" + body.children.length);
         } catch (e) {
           Zotero.debug("AI Reader: onRender ERROR: " + e);
           this.showEmptyState("zotero-air-reader-empty-no-item");
@@ -335,8 +338,10 @@ class AIPanel {
   // ─── Main Chat UI ─────────────────────────────────────────
 
   private buildUI(doc: Document, body: HTMLElement, itemId: number) {
+    Zotero.debug("AI Reader: buildUI start, doc=" + (doc ? "ok" : "null") + " body=" + (body ? "ok" : "null"));
     const container = doc.createElement("div");
     container.className = "air-container";
+    container.style.cssText = "display: flex; flex-direction: column; height: 100%; min-height: 300px; background: #ffeb3b; border: 3px solid red;";
 
     const l10nPrefix = config.addonRef;
 
