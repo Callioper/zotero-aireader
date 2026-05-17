@@ -87,33 +87,49 @@ class AIPanel {
         setEnabled(false);
       },
 
-      onRender: async ({ doc, body, item }) => {
+      onRender: ({ doc, body, item }) => {
+        Zotero.debug("AI Reader: onRender, item=" + (item?.id || "null") + " type=" + (item?.itemType || "N/A"));
         body.replaceChildren();
         this.pane = { doc, body };
 
         if (!item) {
+          Zotero.debug("AI Reader: onRender - no item, showing empty state");
           this.showEmptyState("zotero-air-reader-empty-no-item");
           return;
         }
 
-        const itemId = this.resolveItemId(item);
-        this.currentItemId = itemId;
+        try {
+          const itemId = this.resolveItemId(item);
+          this.currentItemId = itemId;
+          Zotero.debug("AI Reader: onRender - resolved itemId=" + itemId);
 
-        const saved = await conversationStore.load(itemId);
-        if (saved && saved.messages.length > 0) {
-          const conv = this.getConversation(itemId);
-          conv.messages = saved.messages;
-          conv.metadata = saved.metadata;
+          const saved = conversationStore.load(itemId);
+          if (saved && saved.messages.length > 0) {
+            const conv = this.getConversation(itemId);
+            conv.messages = saved.messages;
+            conv.metadata = saved.metadata;
+            Zotero.debug("AI Reader: onRender - loaded " + saved.messages.length + " saved messages");
+          }
+
+          this.cacheMetadata(itemId, item);
+
+          const configured = isChatConfigured();
+          Zotero.debug("AI Reader: onRender - isChatConfigured=" + configured);
+
+          if (!configured) {
+            this.buildSetupUI(doc, body);
+          } else {
+            this.buildUI(doc, body, itemId);
+          }
+        } catch (e) {
+          Zotero.debug("AI Reader: onRender ERROR: " + e);
+          this.showEmptyState("zotero-air-reader-empty-no-item");
+          const errorDiv = document.createElement("div");
+          errorDiv.className = "ai-empty-state";
+          errorDiv.style.cssText = "color: #dc3545;";
+          errorDiv.textContent = "Error: " + String(e);
+          body.appendChild(errorDiv);
         }
-
-        this.cacheMetadata(itemId, item);
-
-        if (!isChatConfigured()) {
-          this.buildSetupUI(doc, body);
-          return;
-        }
-
-        this.buildUI(doc, body, itemId);
       },
 
       onAsyncRender: async ({ body, item }) => {
